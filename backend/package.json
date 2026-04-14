@@ -1,0 +1,38 @@
+{
+  "name": "vibely-backend",
+  "version": "1.0.0",
+  "description": "Express-сервер для музыкального приложения Vibely с интеграцией Yandex Music API",
+  "license": "ISC",
+  "author": "Vibely Team",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npx tsc && node --watch dist/server.js",
+    "start": "node dist/server.js",
+    "build": "npx tsc",
+    "export-jsonl": "curl http://localhost:3000/api/export-jsonl"
+  },
+  "dependencies": {
+    "axios": "^1.13.6",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "pg": "^8.16.3",
+    "ym-api": "^1.2.1"
+  },
+  "overrides": {
+    "axios": ""
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/express-rate-limit": "^6.0.0",
+    "@types/helmet": "^4.0.0",
+    "@types/node": "^25.5.0",
+    "@types/pg": "^8.15.5",
+    "typescript": "^5.9.3"
+  }
+}
