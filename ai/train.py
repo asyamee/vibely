@@ -1,15 +1,22 @@
+from __future__ import annotations
+
 import argparse
+import logging
 import os
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from dataset import build_users_from_events, load_events_from_jsonl
 from inference import pad_artists
 from model import UserMusicEncoder
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+logger = logging.getLogger("vibely-train")
 
 
 def set_seed(seed: int = 42) -> None:
@@ -18,10 +25,6 @@ def set_seed(seed: int = 42) -> None:
 
 
 def build_synthetic_users() -> Dict[str, List[Dict]]:
-    """
-    Простейшие синтетические пользователи в новом формате.
-    Используется, если продовых данных ещё нет.
-    """
     return {
         "user_pop_1": [
             {"track_id": 1, "genre_id": 1, "artist_ids": [1], "rating": 1.0},
@@ -80,192 +83,268 @@ def split_pos_neg(history: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
     return positives, negatives
 
 
-def sample_training_example(users: Dict[str, List[Dict]]) -> Tuple[List[Dict], Dict, Dict]:
-    user_id = random.choice(list(users.keys()))
-    history = users[user_id]
+def sample_bpr_loss(
+    model,
+    users: Dict[str, List[Dict]],
+    user_ids: List[str],
+    device: str,
+    diversity_weight: float = 0.1,
+) -> Optional[torch.Tensor]:
+    """
+    BPR loss + diversity regularization.
 
-    positives, negatives = split_pos_neg(history)
+    Diversity loss = среднее попарное косинусное сходство между векторами
+    пользователей в батче. Минимизация разталкивает их по гиперсфере.
+    """
+    losses: List[torch.Tensor] = []
+    user_vecs: List[torch.Tensor] = []
+    all_user_ids = list(users.keys())
 
-    pos_item = random.choice(positives)
+    for uid in user_ids:
+        history = users[uid]
+        positives, negatives = split_pos_neg(history)
+        if not positives:
+            continue
 
-    if negatives:
-        neg_item = random.choice(negatives)
-    else:
-        other_user_id = random.choice([u for u in users.keys() if u != user_id])
-        neg_item = random.choice(users[other_user_id])
+        pos_item = random.choice(positives)
 
-    return history, pos_item, neg_item
+        if negatives:
+            neg_item = random.choice(negatives)
+        else:
+            other_ids = [u for u in all_user_ids if u != uid]
+            if not other_ids:
+                continue
+            neg_item = random.choice(users[random.choice(other_ids)])
+
+        track_ids = torch.tensor(
+            [x["track_id"] for x in history], dtype=torch.long, device=device
+        )
+        genre_ids = torch.tensor(
+            [x["genre_id"] for x in history], dtype=torch.long, device=device
+        )
+        artist_ids = torch.tensor(
+            pad_artists([x["artist_ids"] for x in history]),
+            dtype=torch.long,
+            device=device,
+        )
+        ratings = torch.tensor(
+            [x["rating"] for x in history], dtype=torch.float32, device=device
+        )
+
+        user_vec = model.encode_user(track_ids, artist_ids, genre_ids, ratings)
+        user_vecs.append(user_vec)
+
+        pos_track = torch.tensor(pos_item["track_id"], dtype=torch.long, device=device)
+        pos_genre = torch.tensor(pos_item["genre_id"], dtype=torch.long, device=device)
+        pos_artists = torch.tensor(pos_item["artist_ids"], dtype=torch.long, device=device)
+        pos_vec = model.encode_track(pos_track, pos_genre, pos_artists, rating_value=1.0)
+
+        neg_track = torch.tensor(neg_item["track_id"], dtype=torch.long, device=device)
+        neg_genre = torch.tensor(neg_item["genre_id"], dtype=torch.long, device=device)
+        neg_artists = torch.tensor(neg_item["artist_ids"], dtype=torch.long, device=device)
+        neg_vec = model.encode_track(neg_track, neg_genre, neg_artists, rating_value=1.0)
+
+        loss = -F.logsigmoid(torch.sum(user_vec * pos_vec) - torch.sum(user_vec * neg_vec))
+        losses.append(loss)
+
+    if not losses:
+        return None
+
+    bpr_loss = torch.stack(losses).mean()
+
+    # Diversity loss: штрафуем за высокое среднее сходство между пользователями в батче.
+    # Векторы уже единичной длины (F.normalize), поэтому dot product = cosine similarity.
+    if diversity_weight > 0 and len(user_vecs) > 1:
+        vecs = torch.stack(user_vecs)           # (N, dim)
+        sim_matrix = vecs @ vecs.T              # (N, N) — косинусные сходства
+        n = sim_matrix.size(0)
+        off_diag = sim_matrix[~torch.eye(n, dtype=torch.bool, device=device)]
+        diversity_loss = off_diag.mean()
+        return bpr_loss + diversity_weight * diversity_loss
+
+    return bpr_loss
 
 
-def history_to_tensors(history: List[Dict], device: str):
-    track_ids = torch.tensor(
-        [x["track_id"] for x in history],
-        dtype=torch.long,
-        device=device,
-    )
-    genre_ids = torch.tensor(
-        [x["genre_id"] for x in history],
-        dtype=torch.long,
-        device=device,
-    )
-    artist_ids = torch.tensor(
-        pad_artists([x["artist_ids"] for x in history]),
-        dtype=torch.long,
-        device=device,
-    )
-    ratings = torch.tensor(
-        [x["rating"] for x in history],
-        dtype=torch.float32,
-        device=device,
-    )
-    return track_ids, artist_ids, genre_ids, ratings
+def get_max_ids_from_events(events: List[Dict]) -> Tuple[int, int, int]:
+    max_track = max_artist = max_genre = 0
+    for ev in events:
+        max_track = max(max_track, ev["track_id"])
+        max_genre = max(max_genre, ev["genre_id"])
+        for a in ev["artist_ids"]:
+            max_artist = max(max_artist, a)
+    return max_track + 1, max_artist + 1, max_genre + 1
 
-
-def item_to_tensors(item: Dict, device: str):
-    track_id = torch.tensor(item["track_id"], dtype=torch.long, device=device)
-    genre_id = torch.tensor(item["genre_id"], dtype=torch.long, device=device)
-    artist_ids = torch.tensor(item["artist_ids"], dtype=torch.long, device=device)
-    return track_id, genre_id, artist_ids
-
-
-def get_max_ids_from_events(events):
-    """Определяет максимальные ID из событий для корректной инициализации модели."""
-    max_track_id = 0
-    max_artist_id = 0
-    max_genre_id = 0
-    
-    for event in events:
-        max_track_id = max(max_track_id, event['track_id'])
-        max_genre_id = max(max_genre_id, event['genre_id'])
-        for artist_id in event['artist_ids']:
-            max_artist_id = max(max_artist_id, artist_id)
-    
-    # Добавляем запас в 10% для будущих данных
-    buffer = 0.1
-    return (
-        max(100, int(max_track_id * (1 + buffer)) + 1),  # Минимум 100 для треков
-        max(100, int(max_artist_id * (1 + buffer)) + 1), # Минимум 100 для артистов
-        max(100, int(max_genre_id * (1 + buffer)) + 1)  # Минимум 100 для жанров
-    )
 
 def train_model(
-    epochs: int = 20,
-    steps_per_epoch: int = 1000,
+    epochs: int = 50,
+    steps_per_epoch: int = 200,
+    batch_size: int = 8,
+    patience: int = 5,
+    min_lr: float = 1e-5,
     model_path: str = "user_encoder.pt",
-    data_path: str | None = None,
+    data_path: Optional[str] = None,
     num_tracks: int = 500_000,
     num_artists: int = 100_000,
     num_genres: int = 64,
     use_gpu: bool = True,
-) -> None:
+    diversity_weight: float = 0.1,
+) -> float:
+    """Обучает модель и возвращает лучший val_loss."""
     set_seed(42)
     device = "cuda" if use_gpu and torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
+    logger.info("Device: %s", device)
 
-    if data_path is not None and os.path.exists(data_path):
-        print(f"Загружаю продовые события из {data_path} ...")
+    # ── Загрузка данных ──────────────────────────────────────────────────────
+    if data_path and os.path.exists(data_path):
+        logger.info("Loading events from %s", data_path)
         events = load_events_from_jsonl(data_path)
         users = build_users_from_events(events)
-        
         if not users:
-            print("Не нашёл валидных пользователей в датаcете, падаю обратно на synthetic.")
+            logger.warning("No valid users in dataset, falling back to synthetic data")
             users = build_synthetic_users()
+            events = []
         else:
-            # Автоматически определяем размеры embedding из данных
-            max_tracks, max_artists, max_genres = get_max_ids_from_events(events)
-            
-            # Используем максимальные значения из данных или заданные параметры, whichever больше
-            num_tracks = max(num_tracks, max_tracks)
-            num_artists = max(num_artists, max_artists)
-            num_genres = max(num_genres, max_genres)
-            
-            print(f"Максимальные ID из данных: tracks={max_tracks}, artists={max_artists}, genres={max_genres}")
-            print(f"Размеры embedding: tracks={num_tracks}, artists={num_artists}, genres={num_genres}")
+            loaded_tracks, loaded_artists, loaded_genres = get_max_ids_from_events(
+                [item for h in users.values() for item in h]
+            )
+            num_tracks = max(num_tracks, loaded_tracks)
+            num_artists = max(num_artists, loaded_artists)
+            num_genres = max(num_genres, loaded_genres)
+            logger.info("Vocab sizes: tracks=%d, artists=%d, genres=%d", num_tracks, num_artists, num_genres)
     else:
-        if data_path is not None:
-            print(f"Файл с данными {data_path} не найден, использую synthetic users.")
+        if data_path:
+            logger.warning("Data file %s not found, using synthetic data", data_path)
         users = build_synthetic_users()
 
-    print(f"Всего пользователей для обучения: {len(users)}")
+    logger.info("Total users: %d", len(users))
 
+    # ── Train / val split ────────────────────────────────────────────────────
+    all_ids = list(users.keys())
+    random.shuffle(all_ids)
+
+    if len(all_ids) >= 5:
+        split = max(1, int(0.8 * len(all_ids)))
+        train_ids = all_ids[:split]
+        val_ids = all_ids[split:]
+    else:
+        train_ids = all_ids
+        val_ids = all_ids  # при малом числе пользователей валидируем на тех же
+
+    train_users = {k: users[k] for k in train_ids}
+    val_users = {k: users[k] for k in val_ids}
+    logger.info("Train: %d users | Val: %d users", len(train_users), len(val_users))
+
+    # ── Модель ───────────────────────────────────────────────────────────────
     model = UserMusicEncoder(
         num_tracks=num_tracks,
         num_artists=num_artists,
         num_genres=num_genres,
-        track_emb_dim=16,
-        artist_emb_dim=8,
-        genre_emb_dim=6,
-        hidden_dim=32,
-        user_emb_dim=16,
     ).to(device)
 
     optimizer = Adam(model.parameters(), lr=1e-3)
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3, min_lr=min_lr)
 
+    best_val_loss = float("inf")
+    patience_counter = 0
+    val_steps = max(10, steps_per_epoch // 5)
+    col_w = len(str(epochs))
+
+    # ── Цикл обучения ────────────────────────────────────────────────────────
     for epoch in range(1, epochs + 1):
+        # Train
         model.train()
-        total_loss = 0.0
+        train_loss_total = 0.0
+        train_steps_done = 0
 
         for _ in range(steps_per_epoch):
-            history, pos_item, neg_item = sample_training_example(users)
-
-            track_ids, artist_ids, genre_ids, ratings = history_to_tensors(history, device)
-            pos_track_id, pos_genre_id, pos_artist_ids = item_to_tensors(pos_item, device)
-            neg_track_id, neg_genre_id, neg_artist_ids = item_to_tensors(neg_item, device)
-
-            user_vec = model.encode_user(track_ids, artist_ids, genre_ids, ratings)
-            pos_vec = model.encode_track(pos_track_id, pos_genre_id, pos_artist_ids, rating_value=1.0)
-            neg_vec = model.encode_track(neg_track_id, neg_genre_id, neg_artist_ids, rating_value=1.0)
-
-            pos_score = torch.sum(user_vec * pos_vec)
-            neg_score = torch.sum(user_vec * neg_vec)
-
-            loss = -F.logsigmoid(pos_score - neg_score)
-
+            batch = random.sample(train_ids, min(batch_size, len(train_ids)))
             optimizer.zero_grad()
+            loss = sample_bpr_loss(model, train_users, batch, device, diversity_weight)
+            if loss is None:
+                continue
             loss.backward()
             optimizer.step()
+            train_loss_total += float(loss.item())
+            train_steps_done += 1
 
-            total_loss += float(loss.item())
+        avg_train = train_loss_total / max(train_steps_done, 1)
 
-        avg_loss = total_loss / steps_per_epoch
-        print(f"Epoch {epoch:03d} | loss = {avg_loss:.4f}")
+        # Validation
+        model.eval()
+        val_loss_total = 0.0
+        val_steps_done = 0
+        with torch.no_grad():
+            for _ in range(val_steps):
+                batch = random.sample(val_ids, min(batch_size, len(val_ids)))
+                loss = sample_bpr_loss(model, val_users, batch, device, diversity_weight)
+                if loss is None:
+                    continue
+                val_loss_total += float(loss.item())
+                val_steps_done += 1
 
-    torch.save(model.state_dict(), model_path)
-    print(f"\nМодель сохранена в {model_path}")
+        avg_val = val_loss_total / max(val_steps_done, 1)
+        current_lr = optimizer.param_groups[0]["lr"]
+
+        scheduler.step(avg_val)
+
+        # Early stopping + best checkpoint
+        marker = ""
+        if avg_val < best_val_loss:
+            best_val_loss = avg_val
+            patience_counter = 0
+            torch.save(model.state_dict(), model_path)
+            marker = "  ★ best"
+
+        else:
+            patience_counter += 1
+
+        logger.info(
+            "Epoch %*d/%d | train=%.4f | val=%.4f | lr=%.6f%s",
+            col_w, epoch, epochs, avg_train, avg_val, current_lr, marker,
+        )
+
+        if patience_counter >= patience:
+            logger.info("Early stopping at epoch %d. Best val_loss=%.4f", epoch, best_val_loss)
+            break
+
+    logger.info("Model saved to %s", model_path)
+    return best_val_loss
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train UserMusicEncoder model.")
-    parser.add_argument(
-        "--data-path",
-        type=str,
-        default=None,
-        help="Путь к JSONL-файлу с продовыми событиями. Если не указан или файл не найден, используется synthetic dataset.",
-    )
-    parser.add_argument(
-        "--model-path",
-        type=str,
-        default="user_encoder.pt",
-        help="Куда сохранить веса модели.",
-    )
-    parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--steps-per-epoch", type=int, default=1000)
+    parser = argparse.ArgumentParser(description="Train UserMusicEncoder")
+    parser.add_argument("--data-path", type=str, default=None)
+    parser.add_argument("--model-path", type=str, default="user_encoder.pt")
+    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--steps-per-epoch", type=int, default=200)
+    parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--patience", type=int, default=5)
+    parser.add_argument("--min-lr", type=float, default=1e-5)
     parser.add_argument("--num-tracks", type=int, default=500_000)
     parser.add_argument("--num-artists", type=int, default=100_000)
     parser.add_argument("--num-genres", type=int, default=64)
-    parser.add_argument("--use-gpu", action="store_true", help="Использовать GPU для тренировки, если доступно")
-
+    parser.add_argument("--use-gpu", action="store_true")
+    parser.add_argument(
+        "--diversity-weight",
+        type=float,
+        default=0.1,
+        help="Вес diversity loss (0 = отключён). Разталкивает векторы пользователей по гиперсфере.",
+    )
     args = parser.parse_args()
 
     train_model(
         epochs=args.epochs,
         steps_per_epoch=args.steps_per_epoch,
+        batch_size=args.batch_size,
+        patience=args.patience,
+        min_lr=args.min_lr,
         model_path=args.model_path,
         data_path=args.data_path,
         num_tracks=args.num_tracks,
         num_artists=args.num_artists,
         num_genres=args.num_genres,
         use_gpu=args.use_gpu,
+        diversity_weight=args.diversity_weight,
     )
 
 

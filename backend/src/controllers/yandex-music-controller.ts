@@ -25,34 +25,43 @@ export const playlist_UUID = async (
 ) => {
   try {
     const { uuid } = req.params;
+    const shuffle = req.query.shuffle === "true";
+    const limit = req.query.limit ? Math.max(1, parseInt(req.query.limit as string, 10)) : undefined;
+
     const response: RawPlaylistResponse = await getPlaylistByUUID(uuid);
 
-    // Подготовим треки в удобном для фронтенда формате и сразу нормализуем обложки
-    const tracks: PlaylistTrackItem[] = response.tracks.map((track) => {
-      return {
-        ...track,
-        track: {
-          ...track.track,
-          ogImage: track.track.ogImage?.replace("%%", "300x300"),
-          albums: track.track.albums.map((album) => ({
-            ...album,
-            coverUri: album.coverUri?.replace("%%", "300x300"),
-          })),
-        },
-      };
-    });
+    let tracks: PlaylistTrackItem[] = response.tracks.map((track) => ({
+      ...track,
+      track: {
+        ...track.track,
+        ogImage: track.track.ogImage?.replace("%%", "300x300"),
+        albums: track.track.albums.map((album) => ({
+          ...album,
+          coverUri: album.coverUri?.replace("%%", "300x300"),
+        })),
+      },
+    }));
 
-    const parsedResponse = {
+    if (shuffle) {
+      for (let i = tracks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tracks[i], tracks[j]] = [tracks[j]!, tracks[i]!];
+      }
+    }
+
+    if (limit !== undefined) {
+      tracks = tracks.slice(0, limit);
+    }
+
+    res.json({
       playlistUuid: response.playlistUuid,
       user: response.owner,
       tracks,
       title: response.title,
       cover: response.ogImage?.replace("%%", "300x300"),
-    };
-
-    res.send(parsedResponse);
+    });
   } catch (e) {
-    res.send(400);
     console.error(e);
+    res.status(400).json({ message: "Failed to fetch playlist from Yandex Music" });
   }
 };

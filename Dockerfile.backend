@@ -1,0 +1,25 @@
+# Backend Dockerfile - Express + TypeScript
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Копируем package.json и устанавливаем зависимости
+COPY backend/package*.json ./
+
+RUN npm ci --omit=dev
+
+# Копируем исходный код
+COPY backend/src ./src
+
+# Компилируем TypeScript
+RUN npm run build
+
+# Expose порт
+EXPOSE 3001
+
+# Переменные окружения (переопределяются при запуске)
+ENV NODE_ENV=production
+ENV PORT=3001
+
+# Запуск compiled сервера
+CMD ["node", "dist/server.js"]

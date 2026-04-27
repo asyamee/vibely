@@ -1,0 +1,223 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.title {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--color-accent);
+  margin: 0;
+  text-align: center;
+}
+
+.subtitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.description {
+  color: var(--color-text-muted);
+  font-size: 16px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.progress {
+  color: var(--color-accent);
+  font-weight: 500;
+  font-size: 14px;
+  background-color: rgba(255, 149, 109, 0.1);
+  padding: 6px 12px;
+  border-radius: var(--radius-small);
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.input {
+  padding: 12px 16px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 149, 109, 0.2);
+  border-radius: var(--radius-element);
+  color: var(--color-text);
+  font-size: 16px;
+  font-family: "Instrument Sans", sans-serif;
+  transition: all 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background-color: rgba(255, 149, 109, 0.05);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.error {
+  padding: 12px;
+  background-color: rgba(255, 0, 0, 0.1);
+  border-radius: var(--radius-element);
+  color: #ff6b6b;
+  font-size: 14px;
+  margin: 0;
+}
+
+.submitButton {
+  align-self: center;
+  min-width: 200px;
+  margin-top: 16px;
+}
+
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trackRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-element);
+  gap: 16px;
+  border: 1px solid rgba(255, 149, 109, 0.1);
+}
+
+.trackInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trackTitle {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.trackArtist {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.stars {
+  display: flex;
+  gap: 8px;
+}
+
+.star {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.star:hover {
+  color: var(--color-accent);
+  transform: scale(1.2);
+}
+
+.starActive {
+  color: var(--color-accent);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 20px;
+  }
+
+  .card {
+    padding: 24px;
+  }
+
+  .title {
+    font-size: 28px;
+  }
+
+  .subtitle {
+    font-size: 20px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .trackRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stars {
+    align-self: flex-end;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .actions > button {
+    width: 100%;
+  }
+
+  .submitButton {
+    width: 100%;
+    align-self: stretch;
+  }
+}

@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: vibely-db
+    environment:
+      POSTGRES_DB: vibely
+      POSTGRES_USER: vibely_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-vibely_password_change_me}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibely_user -d vibely"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vibely-network
+
+  # Backend API сервис
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: vibely-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://vibely_user:${DB_PASSWORD:-vibely_password_change_me}@postgres:5432/vibely
+      ACCESS_TOKEN: ${YANDEX_ACCESS_TOKEN}
+      USER_ID: ${YANDEX_USER_ID}
+      AI_SERVICE_URL: http://ai:8000
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_in_production}
+    ports:
+      - "3001:3001"
+    networks:
+      - vibely-network
+    restart: unless-stopped
+
+  # Frontend Next.js приложение
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: vibely-web
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://api:3001/api
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    networks:
+      - vibely-network
+    restart: unless-stopped
+
+  # AI сервис
+  ai:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai
+    container_name: vibely-ai
+    environment:
+      AI_DEVICE: ${AI_DEVICE:-cpu}
+      AI_MODEL_PATH: user_encoder.pt
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ai/data:/app/data
+      - ./ai/user_encoder.pt:/app/user_encoder.pt
+    networks:
+      - vibely-network
+    restart: unless-stopped
+
+networks:
+  vibely-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

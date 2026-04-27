@@ -1,0 +1,36 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 18px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-element);
+  background-color: transparent;
+  color: var(--color-accent);
+  font-size: 14px;
+  font-weight: 400;
+  opacity: 0.9;
+}
+
+.tagWithButton {
+  padding-left: 18px;
+  padding-right: 9px;
+}
+
+.removeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  cursor: pointer;
+  padding: 0;
+  width: 17px;
+  height: 17px;
+  transition: opacity 0.2s;
+}
+
+.removeButton:hover {
+  opacity: 0.7;
+}

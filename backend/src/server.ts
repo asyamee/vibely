@@ -1,9 +1,14 @@
+import dotenv from "dotenv";
+
+// Загрузка переменных окружения ДО всего остального
+dotenv.config();
+
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
 
 // Импорт конфигурации
 import AppConfig from "./config/app.config.js";
@@ -18,11 +23,9 @@ import {
   notFoundHandler,
 } from "./middleware/error-handler.middleware.js";
 
-// Загрузка переменных окружения
-dotenv.config();
-
 const app = express();
-const PORT = AppConfig.port;
+// Переопределяем PORT после загрузки dotenv
+const PORT = parseInt(process.env.PORT || "3000");
 
 // Инициализация БД (Postgres) + миграции
 const pool = getPool();
@@ -36,6 +39,7 @@ app.use(helmet()); // Защита заголовков
 app.use(cors(AppConfig.cors)); // Настройка кросс-доменных запросов
 app.use(express.json({ limit: "10mb" })); // Парсинг JSON
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); // Парсинг cookies
 
 // Rate limiting
 const limiter = rateLimit({
@@ -43,6 +47,15 @@ const limiter = rateLimit({
   max: AppConfig.rateLimit.max, // ограничение на 100 запросов за окно
 });
 app.use(limiter);
+
+// Строгий rate limiter для auth
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 10, // максимум 10 попыток за окно
+  skipSuccessfulRequests: false,
+});
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
 
 // Логирование запросов
 app.use((req: Request, res: Response, next: NextFunction) => {

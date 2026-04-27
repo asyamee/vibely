@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 // Конфигурация приложения
 export const AppConfig = {
   port: parseInt(process.env.PORT || "3000"),
@@ -6,7 +9,7 @@ export const AppConfig = {
 
   // Конфигурация CORS
   cors: {
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
     credentials: true,
   },
 

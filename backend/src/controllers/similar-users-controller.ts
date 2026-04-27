@@ -3,6 +3,7 @@ import {
   getAllUserEmbeddingsExcept,
   getPool,
   getUserEmbedding,
+  getUsersBatch,
 } from "../db/postgres.js";
 
 type Neighbor = {
@@ -51,10 +52,28 @@ export const getSimilarUsers = (req: Request, res: Response) => {
       }));
 
       neighbors.sort((a, b) => b.similarity - a.similarity);
+      const topNeighbors = neighbors.slice(0, topK);
+
+      const profiles = await getUsersBatch(pool, topNeighbors.map((n) => n.userId));
+      const profileMap = new Map(profiles.map((p) => [p.user_id, p]));
+
+      const enriched = topNeighbors.map((n) => {
+        const profile = profileMap.get(n.userId);
+        return {
+          userId: n.userId,
+          similarity: n.similarity,
+          displayName: profile?.display_name || "Unknown",
+          avatarUrl:
+            profile?.avatar_url ||
+            `https://avatars.yandex.net/get-yapic/${n.userId}/islands-retina-50`,
+          genres: profile?.genres || [],
+          favoriteTracks: profile?.favorite_tracks || [],
+        };
+      });
 
       return res.status(200).json({
         userId,
-        neighbors: neighbors.slice(0, topK),
+        neighbors: enriched,
       });
     } catch (err) {
       console.error(err);

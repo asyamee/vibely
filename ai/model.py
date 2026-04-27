@@ -3,20 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class SafeEmbedding(nn.Module):
-    """Обертка для Embedding, которая безопасно обрабатывает индексы за пределами диапазона."""
-    
-    def __init__(self, num_embeddings: int, embedding_dim: int):
-        super().__init__()
-        self.num_embeddings = num_embeddings
-        self.embedding_layer = nn.Embedding(num_embeddings, embedding_dim)
-    
-    def forward(self, indices: torch.Tensor) -> torch.Tensor:
-        # Обрезаем индексы, чтобы они не выходили за пределы
-        safe_indices = torch.clamp(indices, 0, self.num_embeddings - 1)
-        return self.embedding_layer(safe_indices)
-
-
 class UserMusicEncoder(nn.Module):
     def __init__(
         self,
@@ -31,9 +17,9 @@ class UserMusicEncoder(nn.Module):
     ):
         super().__init__()
 
-        self.track_emb = SafeEmbedding(num_tracks, track_emb_dim)
-        self.artist_emb = SafeEmbedding(num_artists, artist_emb_dim)
-        self.genre_emb = SafeEmbedding(num_genres, genre_emb_dim)
+        self.track_emb = nn.Embedding(num_tracks, track_emb_dim)
+        self.artist_emb = nn.Embedding(num_artists, artist_emb_dim)
+        self.genre_emb = nn.Embedding(num_genres, genre_emb_dim)
 
         # track + aggregated artists + single genre + rating
         input_dim = track_emb_dim + artist_emb_dim + genre_emb_dim + 1
@@ -41,12 +27,14 @@ class UserMusicEncoder(nn.Module):
         self.event_mlp = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
+            nn.Dropout(p=0.4),
             nn.Linear(hidden_dim, user_emb_dim),
         )
 
         self.user_mlp = nn.Sequential(
             nn.Linear(user_emb_dim, hidden_dim),
             nn.ReLU(),
+            nn.Dropout(p=0.4),
             nn.Linear(hidden_dim, user_emb_dim),
         )
 

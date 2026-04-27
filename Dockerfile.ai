@@ -1,0 +1,31 @@
+# AI Service Dockerfile - Python + PyTorch + FastAPI
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Устанавливаем системные зависимости
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копируем requirements.txt
+COPY ai/requirements.txt .
+
+# Устанавливаем Python зависимости
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем исходный код
+COPY ai .
+
+# Проверяем что модель существует, если нет - используем pre-trained
+RUN python -c "import os; \
+    if not os.path.exists('user_encoder.pt'): \
+        print('WARNING: user_encoder.pt not found. Model will be initialized on startup.');"
+
+EXPOSE 8000
+
+ENV AI_DEVICE=cpu
+ENV AI_MODEL_PATH=user_encoder.pt
+
+# Запуск FastAPI сервиса через uvicorn
+CMD ["uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8000"]

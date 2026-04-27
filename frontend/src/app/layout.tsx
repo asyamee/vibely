@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Providers } from "./providers";
 import "./globals.css";
 
 type RootLayoutProps = {
@@ -12,7 +13,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <title>Vibely | Музыкальный</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

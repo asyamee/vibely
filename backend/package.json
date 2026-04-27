@@ -15,11 +15,14 @@
   },
   "dependencies": {
     "axios": "^1.13.6",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.16.3",
     "ym-api": "^1.2.1"
   },
@@ -27,10 +30,13 @@
     "axios": ""
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/express-rate-limit": "^6.0.0",
     "@types/helmet": "^4.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.5.0",
     "@types/pg": "^8.15.5",
     "typescript": "^5.9.3"

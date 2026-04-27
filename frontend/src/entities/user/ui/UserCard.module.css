@@ -1,0 +1,173 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: var(--card-gradient);
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius-card);
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+}
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-small);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+}
+
+.name {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.genreList {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--color-text);
+  padding-left: 9px;
+  margin: 0;
+}
+
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background-color: rgba(14, 13, 19, 0.1);
+  padding: 9px;
+  border-radius: var(--radius-element);
+  max-height: 156px;
+  overflow-y: auto;
+}
+
+.track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.trackContent {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.trackImage {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-small);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.trackInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.trackTitle {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.trackArtist {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.trackIcon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-element);
+  background-color: rgba(255, 149, 109, 0.12);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.actionButton:hover {
+  opacity: 0.8;
+}
+
+.primaryButton {
+  flex: 1;
+  background-color: rgba(255, 149, 109, 0.1);
+  color: var(--color-accent);
+  font-weight: 700;
+  font-size: 16px;
+  padding: 10px 18px;
+  border-radius: var(--radius-element);
+  border: none;
+  cursor: pointer;
+}
+
+.primaryButton:hover {
+  background-color: rgba(255, 149, 109, 0.15);
+}
+
+.icon {
+  color: var(--color-accent);
+}

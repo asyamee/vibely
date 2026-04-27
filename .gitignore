@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+
+# AI model artifacts
+ai/user_encoder.pt
+ai/data/*.jsonl
+
+# Node
+node_modules/
+dist/
+.next/
+out/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+*.tgz
+
+# Env files
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+*.pid
+
+# Claude Code (локальные настройки пользователя)
+.claude/settings.local.json
