@@ -20,7 +20,9 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 
 export const ProfileSettingsPage: React.FC = () => {
   const router = useRouter();
-  const { userId, setProfile } = useUserStore();
+  const userId = useUserStore((s) => s.userId);
+  const hasHydrated = useUserStore((s) => s.hasHydrated);
+  const setProfile = useUserStore((s) => s.setProfile);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,11 @@ export const ProfileSettingsPage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (!userId) return;
+    if (!hasHydrated) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
     const loadProfile = async () => {
       setLoading(true);
@@ -59,7 +65,7 @@ export const ProfileSettingsPage: React.FC = () => {
     };
 
     loadProfile();
-  }, [userId, reset]);
+  }, [userId, hasHydrated, reset]);
 
   const onSubmit = async (data: ProfileFormData) => {
     if (!userId) return;

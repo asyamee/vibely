@@ -9,7 +9,8 @@ import styles from "./ProfilePage.module.css";
 
 export const ProfilePage: React.FC = () => {
   const router = useRouter();
-  const { userId } = useUserStore();
+  const userId = useUserStore((s) => s.userId);
+  const hasHydrated = useUserStore((s) => s.hasHydrated);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const [friends, setFriends] = useState<Array<{ userId: string; displayName: string }>>([]);
@@ -17,8 +18,12 @@ export const ProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!userId) {
-      router.push("/login");
+      // Гидрация завершена и userId всё ещё нет — не авторизованы.
+      // Middleware уже редиректит при отсутствии refreshToken cookie,
+      // поэтому здесь просто выходим без принудительного редиректа.
+      setLoading(false);
       return;
     }
 
@@ -41,7 +46,7 @@ export const ProfilePage: React.FC = () => {
     };
 
     loadProfile();
-  }, [userId]);
+  }, [userId, hasHydrated]);
 
 
   if (loading) return <div className={styles.container}>Загрузка...</div>;
@@ -52,7 +57,9 @@ export const ProfilePage: React.FC = () => {
         <img src={avatarUrl} alt="Avatar" className={styles.avatar} />
         <div className={styles.info}>
           <h1 className={styles.name}>{displayName || userId}</h1>
-          <Button variant="secondary">Настройки</Button>
+          <Button variant="secondary" onClick={() => router.push("/profile/settings")}>
+            Настройки
+          </Button>
         </div>
       </div>
 
@@ -73,9 +80,6 @@ export const ProfilePage: React.FC = () => {
         )}
       </section>
 
-      <a href="/profile/settings" className={styles.settingsLink}>
-        Перейти в настройки →
-      </a>
     </div>
   );
 };

@@ -8,14 +8,15 @@ import type { UserNeighbor } from "@/shared/api/users.api";
 import styles from "./MainFeedPage.module.css";
 
 export const MainFeedPage: React.FC = () => {
-  const { userId } = useUserStore();
+  const userId = useUserStore((s) => s.userId);
+  const hasHydrated = useUserStore((s) => s.hasHydrated);
   const [neighbors, setNeighbors] = useState<UserNeighbor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [favorited, setFavorited] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!userId) return;
+    if (!hasHydrated || !userId) return;
 
     const loadNeighbors = async () => {
       setLoading(true);
@@ -34,7 +35,7 @@ export const MainFeedPage: React.FC = () => {
     };
 
     loadNeighbors();
-  }, [userId]);
+  }, [userId, hasHydrated]);
 
   const handleSendRequest = async (targetUserId: string) => {
     if (!userId) return;
@@ -59,6 +60,10 @@ export const MainFeedPage: React.FC = () => {
       return next;
     });
   };
+
+  if (!hasHydrated) {
+    return <div className={styles.container}><p className={styles.loading}>Загрузка...</p></div>;
+  }
 
   if (!userId) {
     return (
