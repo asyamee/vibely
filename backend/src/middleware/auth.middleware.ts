@@ -17,14 +17,16 @@ interface TokenPayload {
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
+  const headerToken = header?.startsWith("Bearer ") ? header.slice(7) : null;
+  const cookieToken = (req as Request & { cookies?: Record<string, string> }).cookies?.accessToken;
+  const token = headerToken || cookieToken;
 
-  if (!header?.startsWith("Bearer ")) {
+  if (!token) {
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
 
   try {
-    const token = header.slice(7);
     const payload = jwt.verify(token, ACCESS_SECRET) as TokenPayload;
     req.user = { userId: payload.userId };
     next();

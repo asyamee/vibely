@@ -2,32 +2,27 @@
 
 import { ReactNode, useEffect, useRef } from "react";
 import { useUserStore } from "@/shared/store/userStore";
-import { refresh, getMe } from "@/shared/api/auth.api";
+import { getMe } from "@/shared/api/auth.api";
 
 export function Providers({ children }: { children: ReactNode }) {
   const hasHydrated = useUserStore((s) => s.hasHydrated);
-  const accessToken = useUserStore((s) => s.accessToken);
   const triedRef = useRef(false);
 
   useEffect(() => {
-    if (!hasHydrated || accessToken || triedRef.current) return;
+    if (!hasHydrated || triedRef.current) return;
     triedRef.current = true;
 
-    const store = useUserStore.getState();
-    refresh()
-      .then(async ({ accessToken }) => {
-        store.setAccessToken(accessToken);
-        try {
-          const me = await getMe();
-          store.setUserId(me.userId);
-        } catch {
-          // ignore — userId может быть уже в persisted store
-        }
+    // Cookie accessToken/refreshToken браузер прикрепит автоматически (withCredentials).
+    // Если access-cookie валидна — сразу получим профиль; если истекла — axios-интерсептор
+    // сходит за refresh; если refresh упал — интерсептор отправит на /login.
+    getMe()
+      .then((me) => {
+        useUserStore.getState().setUserId(me.userId);
       })
       .catch(() => {
-        store.clearUser();
+        useUserStore.getState().clearUser();
       });
-  }, [hasHydrated, accessToken]);
+  }, [hasHydrated]);
 
   return <>{children}</>;
 }

@@ -1,45 +1,21 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useUserStore } from "@/shared/store/userStore";
-import { getNearestUsers, sendFriendRequest } from "@/shared/api/users.api";
+import React, { useState } from "react";
+import { sendFriendRequest } from "@/shared/api/users.api";
 import { UserCard } from "@/entities/user/ui/UserCard";
 import type { UserNeighbor } from "@/shared/api/users.api";
 import styles from "./MainFeedPage.module.css";
 
-export const MainFeedPage: React.FC = () => {
-  const userId = useUserStore((s) => s.userId);
-  const hasHydrated = useUserStore((s) => s.hasHydrated);
-  const [neighbors, setNeighbors] = useState<UserNeighbor[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+interface MainFeedPageProps {
+  userId: string;
+  initialNeighbors: UserNeighbor[];
+}
+
+export const MainFeedPage: React.FC<MainFeedPageProps> = ({ userId, initialNeighbors }) => {
+  const [neighbors] = useState<UserNeighbor[]>(initialNeighbors);
   const [favorited, setFavorited] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (!hasHydrated || !userId) return;
-
-    const loadNeighbors = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await getNearestUsers(userId, 10);
-        setNeighbors(response.neighbors);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Ошибка загрузки похожих пользователей",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadNeighbors();
-  }, [userId, hasHydrated]);
-
   const handleSendRequest = async (targetUserId: string) => {
-    if (!userId) return;
-
     try {
       await sendFriendRequest(userId, targetUserId);
       alert("Запрос в друзья отправлен");
@@ -61,46 +37,24 @@ export const MainFeedPage: React.FC = () => {
     });
   };
 
-  if (!hasHydrated) {
-    return <div className={styles.container}><p className={styles.loading}>Загрузка...</p></div>;
-  }
-
-  if (!userId) {
-    return (
-      <div className={styles.container}>
-        <h1 className={styles.title}>Vibely — подбор похожих пользователей</h1>
-        <p className={styles.message}>
-          Сначала оцени плейлист на{" "}
-          <a href="/model-train" className={styles.link}>
-            странице обучения модели
-          </a>
-          .
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>Похожие пользователи</h1>
 
-      {error && <p className={styles.error}>{error}</p>}
-      {loading && <p className={styles.loading}>Загрузка...</p>}
-
-      <div className={styles.grid}>
-        {neighbors.map((neighbor) => (
-          <UserCard
-            key={neighbor.userId}
-            user={neighbor}
-            onSendRequest={() => handleSendRequest(neighbor.userId)}
-            onFavorite={() => handleFavorite(neighbor.userId)}
-            isFavorited={favorited.has(neighbor.userId)}
-          />
-        ))}
-      </div>
-
-      {neighbors.length === 0 && !loading && !error && (
+      {neighbors.length === 0 ? (
         <p className={styles.message}>Нет похожих пользователей</p>
+      ) : (
+        <div className={styles.grid}>
+          {neighbors.map((neighbor) => (
+            <UserCard
+              key={neighbor.userId}
+              user={neighbor}
+              onSendRequest={() => handleSendRequest(neighbor.userId)}
+              onFavorite={() => handleFavorite(neighbor.userId)}
+              isFavorited={favorited.has(neighbor.userId)}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

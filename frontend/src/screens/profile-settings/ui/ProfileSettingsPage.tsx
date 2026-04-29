@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUserStore } from "@/shared/store/userStore";
-import { getProfile, updateProfile } from "@/shared/api/users.api";
+import { getProfile, updateProfile, type UserProfile } from "@/shared/api/users.api";
 import { Button } from "@/shared/ui/Button/Button";
 import { Input } from "@/shared/ui/Input/Input";
 import styles from "./ProfileSettingsPage.module.css";
@@ -18,58 +18,33 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
-export const ProfileSettingsPage: React.FC = () => {
+interface ProfileSettingsPageProps {
+  userId: string;
+  initialProfile: UserProfile;
+}
+
+export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
+  userId,
+  initialProfile,
+}) => {
   const router = useRouter();
-  const userId = useUserStore((s) => s.userId);
-  const hasHydrated = useUserStore((s) => s.hasHydrated);
   const setProfile = useUserStore((s) => s.setProfile);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const {
     control,
     handleSubmit,
-    reset,
     formState: { errors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      displayName: "",
-      genres: "",
+      displayName: initialProfile.displayName || "",
+      genres: initialProfile.genres?.join(", ") || "",
     },
   });
 
-  useEffect(() => {
-    if (!hasHydrated) return;
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-
-    const loadProfile = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const profileData = await getProfile(userId);
-        reset({
-          displayName: profileData.displayName || "",
-          genres: profileData.genres?.join(", ") || "",
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка загрузки профиля");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile();
-  }, [userId, hasHydrated, reset]);
-
   const onSubmit = async (data: ProfileFormData) => {
-    if (!userId) return;
-
     setSaving(true);
     setError(null);
 
@@ -91,18 +66,6 @@ export const ProfileSettingsPage: React.FC = () => {
       setSaving(false);
     }
   };
-
-  if (!userId) {
-    return (
-      <div className={styles.container}>
-        <p className={styles.message}>Пожалуйста, сначала оцени плейлист</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return <div className={styles.container}>Загрузка...</div>;
-  }
 
   return (
     <div className={styles.container}>

@@ -22,6 +22,43 @@ interface TokenPayload {
   userId: string;
 }
 
+const REFRESH_COOKIE_NAME = "refreshToken";
+const ACCESS_COOKIE_NAME = "accessToken";
+
+const buildRefreshCookieOptions = (expires: Date) => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict" as const,
+  expires,
+  path: "/",
+  ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+});
+
+// Срок жизни access-cookie совпадает с TTL JWT — после истечения интерсептор сходит за refresh.
+const ACCESS_COOKIE_TTL_MS = 15 * 60 * 1000;
+const buildAccessCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict" as const,
+  maxAge: ACCESS_COOKIE_TTL_MS,
+  path: "/",
+  ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+});
+
+const clearAuthCookies = (res: Response) => {
+  const base = {
+    path: "/",
+    ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+  };
+  res.clearCookie(REFRESH_COOKIE_NAME, base);
+  res.clearCookie(ACCESS_COOKIE_NAME, base);
+  // Подчищаем легаси-cookie со старым path="/api/auth"
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    ...base,
+    path: "/api/auth",
+  });
+};
+
 export const register = async (req: Request, res: Response) => {
   const { email, password, displayName } = req.body as {
     email?: string;
@@ -83,13 +120,8 @@ export const register = async (req: Request, res: Response) => {
 
     await saveRefreshToken(pool, tokenHash, userId, expiresAt);
 
-    res.cookie("refreshToken", rawRefresh, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      expires: expiresAt,
-      path: "/",
-    });
+    res.cookie(REFRESH_COOKIE_NAME, rawRefresh, buildRefreshCookieOptions(expiresAt));
+    res.cookie(ACCESS_COOKIE_NAME, accessToken, buildAccessCookieOptions());
 
     return res.status(201).json({
       userId,
@@ -140,13 +172,8 @@ export const login = async (req: Request, res: Response) => {
 
     await saveRefreshToken(pool, tokenHash, user.user_id, expiresAt);
 
-    res.cookie("refreshToken", rawRefresh, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      expires: expiresAt,
-      path: "/",
-    });
+    res.cookie(REFRESH_COOKIE_NAME, rawRefresh, buildRefreshCookieOptions(expiresAt));
+    res.cookie(ACCESS_COOKIE_NAME, accessToken, buildAccessCookieOptions());
 
     return res.status(200).json({
       userId: user.user_id,
@@ -192,13 +219,8 @@ export const refresh = async (req: Request, res: Response) => {
 
     await saveRefreshToken(pool, newTokenHash, tokenRecord.user_id, newExpiresAt);
 
-    res.cookie("refreshToken", newRawRefresh, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      expires: newExpiresAt,
-      path: "/api/auth",
-    });
+    res.cookie(REFRESH_COOKIE_NAME, newRawRefresh, buildRefreshCookieOptions(newExpiresAt));
+    res.cookie(ACCESS_COOKIE_NAME, accessToken, buildAccessCookieOptions());
 
     return res.status(200).json({ accessToken });
   } catch (error) {
@@ -220,7 +242,7 @@ export const logout = async (req: Request, res: Response) => {
     }
   }
 
-  res.clearCookie("refreshToken", { path: "/" });
+  clearAuthCookies(res);
   return res.status(200).json({ success: true });
 };
 
