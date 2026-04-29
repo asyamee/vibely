@@ -23,6 +23,10 @@ ENV NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend ./
 
+# public/ может отсутствовать в репозитории (пустая папка не попадает в git/docker context),
+# создаём её как fallback, чтобы последующий COPY в runtime-стейдже не упал.
+RUN mkdir -p public
+
 # Telemetry off — иначе Next.js шлёт анонимную статистику Vercel
 ENV NEXT_TELEMETRY_DISABLED=1
 
