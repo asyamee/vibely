@@ -1,31 +1,40 @@
-# AI Service Dockerfile - Python + PyTorch + FastAPI
+# AI Service Dockerfile — Python 3.11 + PyTorch (CPU) + FastAPI
+#
+# CPU-only сборка PyTorch: при размере embedding-таблиц ~40 МБ и батче 8
+# inference и обучение умещаются в CPU за приемлемое время.
+# При необходимости GPU — заменить базовый образ на pytorch/pytorch:*-cuda
+# и переопределить AI_DEVICE=cuda.
+
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Устанавливаем системные зависимости
+# curl — для healthcheck в docker-compose; gcc — для сборки нативных
+# колёс (например, numpy при отсутствии prebuilt wheels)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем requirements.txt
+# Сначала только requirements — кэшируем слой установки зависимостей
 COPY ai/requirements.txt .
-
-# Устанавливаем Python зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем исходный код
+# Исходники AI-сервиса.
+# user_encoder.pt в .gitignore и не попадает в build-контекст —
+# веса монтируются volume'ом из docker-compose. Если файла нет на
+# момент старта, service.py инициализирует модель со случайными весами.
 COPY ai .
 
-# Проверяем что модель существует, если нет - используем pre-trained
-RUN python -c "import os; \
-    if not os.path.exists('user_encoder.pt'): \
-        print('WARNING: user_encoder.pt not found. Model will be initialized on startup.');"
+# Non-root пользователь для запуска
+RUN useradd --create-home --shell /bin/bash aiuser \
+    && chown -R aiuser:aiuser /app
+USER aiuser
 
 EXPOSE 8000
 
 ENV AI_DEVICE=cpu
 ENV AI_MODEL_PATH=user_encoder.pt
+ENV PYTHONUNBUFFERED=1
 
-# Запуск FastAPI сервиса через uvicorn
 CMD ["uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -10,6 +10,7 @@ venv/
 # AI model artifacts
 ai/user_encoder.pt
 ai/data/*.jsonl
+docs
 
 # Node
 node_modules/

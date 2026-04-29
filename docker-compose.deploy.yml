@@ -1,11 +1,16 @@
-# Production docker-compose для Vibely.
+# Production docker-compose для деплоя через GitHub Actions.
 #
-# Используется на сервере, где образы СОБИРАЮТСЯ локально (git pull → docker
-# compose build → up). Если деплой идёт через GitHub Actions с готовыми
-# образами в ghcr.io — используйте docker-compose.deploy.yml вместо этого.
+# Отличается от docker-compose-prod.yml тем, что НЕ собирает образы локально,
+# а тянет готовые из GitHub Container Registry (ghcr.io). Это в десятки раз
+# быстрее на сервере (нет git pull, нет npm install, нет TypeScript-компиляции)
+# и не требует исходников на сервере вообще.
 #
-# Внешний трафик принимает только nginx (80/443). Все остальные сервисы
-# доступны только внутри сети vibely-network.
+# Использование:
+#   docker compose -f docker-compose.deploy.yml --env-file .env.production pull
+#   docker compose -f docker-compose.deploy.yml --env-file .env.production up -d
+#
+# IMAGE_TAG задаётся GitHub Actions из git SHA. Локально можно использовать
+# IMAGE_TAG=latest для последнего успешного билда из main.
 
 services:
   postgres:
@@ -15,8 +20,6 @@ services:
       POSTGRES_DB: vibely
       POSTGRES_USER: vibely_user
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
-    # Намеренно НЕ публикуем 5432 наружу — только внутренняя сеть.
-    # Для бэкапов используйте `docker exec vibely-db pg_dump ...`
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
@@ -34,10 +37,9 @@ services:
       -c shared_buffers=256MB
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    image: vibely-backend:local
+    # GHCR_OWNER задаётся из env (обычно совпадает с GitHub username/org).
+    # IMAGE_TAG — git SHA коммита или "latest".
+    image: ghcr.io/${GHCR_OWNER}/vibely-backend:${IMAGE_TAG:-latest}
     container_name: vibely-api
     depends_on:
       postgres:
@@ -46,26 +48,21 @@ services:
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: postgresql://vibely_user:${DB_PASSWORD}@postgres:5432/vibely
-      # Yandex Music API (см. backend/src/config/app.config.ts)
       ACCESS_TOKEN: ${YANDEX_ACCESS_TOKEN}
       USER_ID: ${YANDEX_USER_ID}
-      # AI-сервис
       AI_SERVICE_URL: http://ai:8000
       AI_ADMIN_TOKEN: ${AI_ADMIN_TOKEN}
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
-      # JWT — реальные имена переменных, которые читает auth-controller.ts
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET required}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET required}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
-      # CORS / cookies
-      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN required - your public domain}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN required}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN}
     networks:
       - vibely-network
     restart: always
     healthcheck:
-      # /health существует в server.ts:70 — это правильный endpoint
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
@@ -73,14 +70,9 @@ services:
       start_period: 20s
 
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        # NEXT_PUBLIC_BACKEND_URL инлайнится в JS-бандл во время build.
-        # /api — относительный путь, nginx маршрутизирует на api:3001
-        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-/api}
-    image: vibely-frontend:local
+    # Образ frontend собран с уже впечённым NEXT_PUBLIC_BACKEND_URL
+    # (см. build-arg в .github/workflows/build.yml)
+    image: ghcr.io/${GHCR_OWNER}/vibely-frontend:${IMAGE_TAG:-latest}
     container_name: vibely-web
     depends_on:
       - api
@@ -97,23 +89,15 @@ services:
       start_period: 30s
 
   ai:
-    build:
-      context: .
-      dockerfile: Dockerfile.ai
-    image: vibely-ai:local
+    image: ghcr.io/${GHCR_OWNER}/vibely-ai:${IMAGE_TAG:-latest}
     container_name: vibely-ai
     environment:
       AI_DEVICE: ${AI_DEVICE:-cpu}
       AI_MODEL_PATH: /app/user_encoder.pt
       AI_ADMIN_TOKEN: ${AI_ADMIN_TOKEN}
     volumes:
-      # Веса модели и данные — bind mount, чтобы переобучение
-      # сохранялось между рестартами контейнера
       - ./ai/data:/app/data
       - ai_weights:/app/weights
-      # user_encoder.pt НЕ монтируется как файл — это бьёт Docker, если
-      # файла на хосте не существует. Вместо этого AI_MODEL_PATH указывает
-      # внутрь контейнера, а сам файл создаётся скриптом обучения.
     networks:
       - vibely-network
     restart: always
@@ -128,9 +112,6 @@ services:
         limits:
           cpus: '2'
           memory: 4G
-        reservations:
-          cpus: '1'
-          memory: 2G
 
   nginx:
     image: nginx:alpine
@@ -140,8 +121,6 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      # SSL-сертификаты от Let's Encrypt. Если SSL ещё не настроен,
-      # certbot создаст эту папку при первом запуске.
       - ./ssl:/etc/nginx/ssl:ro
       - ./certbot/www:/var/www/certbot:ro
       - nginx_cache:/var/cache/nginx

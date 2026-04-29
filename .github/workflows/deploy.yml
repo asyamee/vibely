@@ -1,0 +1,106 @@
+# Deploy — обновление production-окружения на сервере.
+#
+# Триггеры:
+#   1. Автоматически после успешной сборки в build.yml (через repository_dispatch)
+#   2. Вручную из UI Actions с указанием тега образа (для отката или хотфикса)
+#
+# Что делает:
+#   1. Подключается по SSH к серверу.
+#   2. Логинится в ghcr.io (нужно если образы приватные).
+#   3. Тянет новые образы по тегу.
+#   4. Перезапускает сервисы через docker compose up -d.
+#   5. Чистит старые образы и неиспользуемые слои.
+#
+# Требуемые GitHub Secrets:
+#   SSH_HOST    — IP или hostname сервера
+#   SSH_USER    — пользователь для SSH (например, deploy)
+#   SSH_KEY     — приватный SSH-ключ в формате OpenSSH (содержимое id_ed25519)
+#   GHCR_PAT    — Personal Access Token с правом read:packages (если репо приватный).
+#                 Для публичных репо не нужен.
+
+name: Deploy
+
+on:
+  repository_dispatch:
+    types: [deploy]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (например, sha-abc1234 или latest)'
+        required: true
+        default: 'latest'
+
+jobs:
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "tag=${{ github.event.client_payload.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      # appleboy/ssh-action: запускает скрипт на удалённом сервере по SSH.
+      # Все переменные окружения, объявленные в envs:, прокидываются в shell.
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: IMAGE_TAG,GHCR_OWNER,GHCR_PAT,GITHUB_ACTOR
+          script: |
+            set -e
+
+            # Папка, куда был склонирован репозиторий (или просто разложены
+            # docker-compose.deploy.yml + nginx.conf + .env.production)
+            cd /opt/vibely
+
+            # Логин в ghcr.io. Для публичных образов это можно пропустить,
+            # но не помешает. GHCR_PAT берётся из secrets если репо приватный,
+            # иначе подойдёт любой токен с минимальными правами.
+            if [ -n "$GHCR_PAT" ]; then
+              echo "$GHCR_PAT" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            fi
+
+            # Экспортируем переменные для docker compose
+            export IMAGE_TAG="$IMAGE_TAG"
+            export GHCR_OWNER="$GHCR_OWNER"
+
+            echo "Pulling images with tag: $IMAGE_TAG"
+            docker compose -f docker-compose.deploy.yml --env-file .env.production pull
+
+            echo "Restarting services..."
+            docker compose -f docker-compose.deploy.yml --env-file .env.production up -d --remove-orphans
+
+            # Чистим старые образы и неиспользуемые слои.
+            # -f не запрашивает подтверждения; --filter "until=24h" — не трогает
+            # свежие, чтобы можно было быстро откатиться.
+            docker image prune -af --filter "until=24h"
+
+            echo "Deployed successfully"
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+          GHCR_OWNER: ${{ github.repository_owner }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
+      - name: Smoke test
+        # Проверяем, что сайт ответил 200/301 на главной странице.
+        # Если упал — деплой считается неудачным.
+        run: |
+          for i in 1 2 3 4 5; do
+            sleep 10
+            if curl -fsS -o /dev/null -w "%{http_code}" "https://${{ vars.PUBLIC_DOMAIN || secrets.SSH_HOST }}/" | grep -qE "^(200|301|302)$"; then
+              echo "Site is up"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying..."
+          done
+          echo "Site not responding after deploy"
+          exit 1

@@ -1,0 +1,109 @@
+# Build & push — сборка трёх Docker-образов (frontend, backend, ai)
+# и публикация в GitHub Container Registry (ghcr.io).
+#
+# Триггер: каждый успешный push в main (после прохождения CI).
+# Образы тегаются:
+#   - sha-<git-sha>  — конкретная версия для отката
+#   - latest         — последний успешный билд
+#
+# Использует docker/build-push-action с buildx-кэшем в GitHub Actions cache —
+# повторные сборки идут в 5-10 раз быстрее за счёт кэша слоёв.
+
+name: Build & Push
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # позволяет запустить вручную из UI Actions
+
+env:
+  REGISTRY: ghcr.io
+  # github.repository_owner = username/org владельца репо в нижнем регистре
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write  # право пушить в ghcr.io
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            dockerfile: Dockerfile.backend
+            image: vibely-backend
+            build_args: ""
+          - service: frontend
+            dockerfile: Dockerfile.frontend
+            image: vibely-frontend
+            # NEXT_PUBLIC_BACKEND_URL вшивается в JS-бандл на этапе build.
+            # /api — относительный путь, работает за nginx
+            build_args: |
+              NEXT_PUBLIC_BACKEND_URL=/api
+          - service: ai
+            dockerfile: Dockerfile.ai
+            image: vibely-ai
+            build_args: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # buildx — расширенная версия docker build с поддержкой кэша,
+      # multi-arch и более эффективных layer caching стратегий
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Логин в ghcr.io: GITHUB_TOKEN автоматически имеет права push
+      # для пакетов в том же репозитории
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Генерация набора тегов и labels из git-метаданных
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build_args }}
+          # GitHub Actions cache — кэш слоёв между запусками workflow.
+          # mode=max сохраняет все intermediate-слои, не только финальный.
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  # После успешной сборки всех трёх образов — триггерим деплой
+  trigger-deploy:
+    name: Trigger deploy
+    needs: build
+    runs-on: ubuntu-latest
+    # Только для пушей в main, не для workflow_dispatch
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Dispatch deploy workflow
+        # Запускаем deploy.yml с image_tag = git sha этого коммита
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: deploy
+          client-payload: '{"image_tag": "sha-${{ github.sha }}"}'

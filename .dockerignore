@@ -1,19 +1,43 @@
-node_modules
-npm-debug.log
+# Зависимости и кэш — должны устанавливаться внутри образа
+**/node_modules
+**/npm-debug.log
+**/.next
+**/dist
+**/build
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/venv
+
+# Веса модели — монтируются volume'ом, не пакуются в образ
+ai/user_encoder.pt
+ai/data/
+
+# Локальные секреты — никогда не должны попасть в образ
+.env
+.env.*
+!.env.example
+!.env.production.example
+backend/.env
+frontend/.env.local
+
+# VCS и IDE
 .git
 .gitignore
-README.md
-.env
-.env.local
-.DS_Store
-__pycache__
-*.pyc
-.pytest_cache
-.venv
-venv
-dist
-build
-*.egg-info
-.claude
+.github
 .vscode
 .idea
+.claude
+.DS_Store
+
+# Документация и md (не нужна в runtime-образе)
+*.md
+docs/
+
+# Бэкапы и временные файлы
+backups/
+*.dump
+*.sql.gz
+*.tar.gz
+ssl/
