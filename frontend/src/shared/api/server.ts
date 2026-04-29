@@ -19,23 +19,35 @@ export async function serverFetch<T>(
     .map((c) => `${c.name}=${c.value}`)
     .join("; ");
 
-  const res = await fetch(`${BACKEND_INTERNAL_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(cookieHeader ? { cookie: cookieHeader } : {}),
-      ...headers,
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    cache: "no-store",
-  });
+  const url = `${BACKEND_INTERNAL_URL}${path}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
+        ...headers,
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      cache: "no-store",
+    });
+  } catch (err) {
+    // Самый частый кейс: BACKEND_INTERNAL_URL недостижим из контейнера web.
+    console.error(`[serverFetch] network error on ${url}:`, err);
+    throw new Error(
+      `Не удалось достучаться до backend (${url}). Проверь BACKEND_INTERNAL_URL.`,
+    );
+  }
 
   if (res.status === 401 && redirectOnUnauthorized) {
     redirect("/login");
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Backend ${res.status} on ${path}: ${text}`);
+    console.error(`[serverFetch] ${res.status} on ${url}: ${text}`);
+    throw new Error(`Backend ${res.status} on ${path}`);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
