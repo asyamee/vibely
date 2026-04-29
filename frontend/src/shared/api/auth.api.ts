@@ -37,7 +37,13 @@ export async function logout(): Promise<void> {
   await apiClient.post("/auth/logout");
 }
 
-export async function getMe(): Promise<any> {
-  const response = await apiClient.get("/auth/me");
+export interface MeResponse {
+  userId: string;
+  email: string;
+  displayName: string | null;
+}
+
+export async function getMe(): Promise<MeResponse> {
+  const response = await apiClient.get<MeResponse>("/auth/me");
   return response.data;
 }
