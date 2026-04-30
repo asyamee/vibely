@@ -34,6 +34,10 @@ migrate(pool).catch((e) => {
   process.exit(1);
 });
 
+// Доверяем заголовкам X-Forwarded-* от reverse-proxy (nginx/Traefik/Cloud).
+// Без этого все запросы за прокси будут считаться одним IP и упрутся в лимит.
+app.set("trust proxy", 1);
+
 // Middleware
 app.use(helmet()); // Защита заголовков
 app.use(cors(AppConfig.cors)); // Настройка кросс-доменных запросов
@@ -41,18 +45,27 @@ app.use(express.json({ limit: "10mb" })); // Парсинг JSON
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser()); // Парсинг cookies
 
-// Rate limiting
+// Глобальный rate-limiter — щедрый, чтобы SPA с SSR-перезагрузками не утыкался.
 const limiter = rateLimit({
-  windowMs: AppConfig.rateLimit.windowMs, // 15 минут
-  max: AppConfig.rateLimit.max, // ограничение на 100 запросов за окно
+  windowMs: AppConfig.rateLimit.windowMs,
+  max: AppConfig.rateLimit.max,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Не считаем дешёвые/частые служебные запросы.
+  skip: (req) =>
+    req.path === "/health" ||
+    req.path === "/api/auth/refresh" ||
+    req.path === "/api/auth/me",
 });
 app.use(limiter);
 
-// Строгий rate limiter для auth
+// Строгий rate-limiter только для login/register (защита от брутфорса).
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 минут
-  max: 10, // максимум 10 попыток за окно
-  skipSuccessfulRequests: false,
+  windowMs: 15 * 60 * 1000,
+  max: AppConfig.rateLimit.authMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
 });
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);

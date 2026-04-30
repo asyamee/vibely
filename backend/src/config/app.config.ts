@@ -16,7 +16,8 @@ export const AppConfig = {
   // Конфигурация rate limiting
   rateLimit: {
     windowMs: 15 * 60 * 1000, // 15 минут
-    max: parseInt(process.env.RATE_LIMIT_MAX || "100"), // ограничение на 100 запросов
+    max: parseInt(process.env.RATE_LIMIT_MAX || "2000"), // глобальный лимит на IP
+    authMax: parseInt(process.env.RATE_LIMIT_AUTH_MAX || "30"), // login/register
   },
 
   // Конфигурация Yandex Music API
