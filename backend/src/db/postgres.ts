@@ -9,6 +9,7 @@ export type DbUserEvent = {
   artist_ids: number[]; // internal
   rating: number;
   ts: string;
+  include_in_training?: boolean;
 };
 
 let _pool: Pool | null = null;
@@ -87,10 +88,24 @@ export async function migrate(pool: Pool): Promise<void> {
 
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_email TEXT;
 
     ALTER TABLE tracks ADD COLUMN IF NOT EXISTS title TEXT;
     ALTER TABLE tracks ADD COLUMN IF NOT EXISTS cover_url TEXT;
     ALTER TABLE tracks ADD COLUMN IF NOT EXISTS artist_ids_external BIGINT[];
+
+    ALTER TABLE user_events ADD COLUMN IF NOT EXISTS include_in_training BOOLEAN NOT NULL DEFAULT TRUE;
+
+    CREATE TABLE IF NOT EXISTS user_playlists (
+      user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      playlist_uuid TEXT NOT NULL,
+      title TEXT,
+      is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+      added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, playlist_uuid)
+    );
 
     CREATE TABLE IF NOT EXISTS refresh_tokens (
       token_hash  TEXT PRIMARY KEY,
@@ -161,9 +176,9 @@ export async function insertUserEvent(db: Queryable, ev: DbUserEvent): Promise<v
   await db.query(
     `
     INSERT INTO user_events
-      (user_id, playlist_uuid, track_id, genre_id, artist_ids, rating, ts)
+      (user_id, playlist_uuid, track_id, genre_id, artist_ids, rating, ts, include_in_training)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7)
+      ($1, $2, $3, $4, $5, $6, $7, $8)
   `,
     [
       ev.user_id,
@@ -173,6 +188,7 @@ export async function insertUserEvent(db: Queryable, ev: DbUserEvent): Promise<v
       ev.artist_ids,
       ev.rating,
       ev.ts,
+      ev.include_in_training !== false,
     ],
   );
 }
@@ -187,6 +203,7 @@ export async function exportEventsForTraining(pool: Pool): Promise<string> {
   }>(`
     SELECT user_id, track_id, genre_id, artist_ids, rating
     FROM user_events
+    WHERE include_in_training = TRUE
     ORDER BY id ASC
   `);
 
@@ -247,23 +264,215 @@ export async function upsertUser(
   displayName?: string,
   avatarUrl?: string,
 ): Promise<void> {
-  const url = avatarUrl || `https://avatars.yandex.net/get-yapic/${userId}/islands-retina-50`;
+  // Если avatarUrl не передан — для НОВОЙ записи подставим дефолтный, для существующей сохраним текущий.
+  const url = avatarUrl ?? null;
   await db.query(
     `
     INSERT INTO users (user_id, display_name, avatar_url)
-    VALUES ($1, $2, $3)
-    ON CONFLICT (user_id) DO UPDATE SET display_name = COALESCE($2, EXCLUDED.display_name), avatar_url = COALESCE($3, EXCLUDED.avatar_url)
+    VALUES ($1, $2, COALESCE($3, $4))
+    ON CONFLICT (user_id) DO UPDATE SET
+      display_name = COALESCE(EXCLUDED.display_name, users.display_name),
+      avatar_url   = COALESCE($3, users.avatar_url)
   `,
-    [userId, displayName || null, url],
+    [userId, displayName || null, url, `https://avatars.yandex.net/get-yapic/${userId}/islands-retina-50`],
   );
 }
+
+export async function updateUserContacts(
+  pool: Pool,
+  userId: string,
+  contacts: { telegram?: string | null; phone?: string | null; contactEmail?: string | null },
+): Promise<void> {
+  await pool.query(
+    `UPDATE users SET
+       telegram      = $2,
+       phone         = $3,
+       contact_email = $4
+     WHERE user_id = $1`,
+    [userId, contacts.telegram ?? null, contacts.phone ?? null, contacts.contactEmail ?? null],
+  );
+}
+
+export async function updateUserPasswordHash(
+  pool: Pool,
+  userId: string,
+  passwordHash: string,
+): Promise<void> {
+  await pool.query(
+    `UPDATE users SET password_hash = $2 WHERE user_id = $1`,
+    [userId, passwordHash],
+  );
+}
+
+export async function getUserPasswordHash(
+  pool: Pool,
+  userId: string,
+): Promise<string | null> {
+  const res = await pool.query<{ password_hash: string | null }>(
+    `SELECT password_hash FROM users WHERE user_id = $1`,
+    [userId],
+  );
+  if (!res.rows.length) return null;
+  return res.rows[0]!.password_hash;
+}
+
+export async function deleteUserCascade(pool: Pool, userId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // friendships, user_genres, user_playlists, refresh_tokens — ON DELETE CASCADE
+    await client.query(`DELETE FROM user_events WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM user_embeddings WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM users WHERE user_id = $1`, [userId]);
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listUserPlaylists(
+  pool: Pool,
+  userId: string,
+): Promise<{ playlist_uuid: string; title: string | null; is_primary: boolean; added_at: string }[]> {
+  const res = await pool.query<{ playlist_uuid: string; title: string | null; is_primary: boolean; added_at: string }>(
+    `SELECT playlist_uuid, title, is_primary, added_at
+     FROM user_playlists
+     WHERE user_id = $1
+     ORDER BY is_primary DESC, added_at DESC`,
+    [userId],
+  );
+  return res.rows;
+}
+
+export async function addUserPlaylistRecord(
+  db: Queryable,
+  userId: string,
+  playlistUuid: string,
+  title: string | null,
+  isPrimary: boolean,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO user_playlists (user_id, playlist_uuid, title, is_primary)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (user_id, playlist_uuid) DO UPDATE SET
+       title      = COALESCE(EXCLUDED.title, user_playlists.title),
+       is_primary = user_playlists.is_primary OR EXCLUDED.is_primary`,
+    [userId, playlistUuid, title, isPrimary],
+  );
+}
+
+export async function removeUserPlaylistRecord(
+  pool: Pool,
+  userId: string,
+  playlistUuid: string,
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `DELETE FROM user_events WHERE user_id = $1 AND playlist_uuid = $2`,
+      [userId, playlistUuid],
+    );
+    await client.query(
+      `DELETE FROM user_playlists WHERE user_id = $1 AND playlist_uuid = $2`,
+      [userId, playlistUuid],
+    );
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getPendingFriendRequests(
+  pool: Pool,
+  userId: string,
+): Promise<{
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  created_at: string;
+}[]> {
+  const res = await pool.query<{
+    user_id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    created_at: string;
+  }>(
+    `SELECT u.user_id, u.display_name, u.avatar_url, f.created_at
+     FROM friendships f
+     JOIN users u ON u.user_id = f.user_id_a
+     WHERE f.user_id_b = $1 AND f.status = 'pending'
+     ORDER BY f.created_at DESC`,
+    [userId],
+  );
+  return res.rows;
+}
+
+export async function rejectFriendRequest(
+  pool: Pool,
+  userId: string,
+  fromUserId: string,
+): Promise<void> {
+  await pool.query(
+    `DELETE FROM friendships
+     WHERE ((user_id_a = $2 AND user_id_b = $1) OR (user_id_a = $1 AND user_id_b = $2))
+       AND status = 'pending'`,
+    [userId, fromUserId],
+  );
+}
+
+export async function removeFriendship(
+  pool: Pool,
+  userId: string,
+  otherUserId: string,
+): Promise<void> {
+  await pool.query(
+    `DELETE FROM friendships
+     WHERE (user_id_a = $1 AND user_id_b = $2) OR (user_id_a = $2 AND user_id_b = $1)`,
+    [userId, otherUserId],
+  );
+}
+
+export async function getFriendshipStatus(
+  pool: Pool,
+  userId: string,
+  otherUserId: string,
+): Promise<"none" | "pending_outgoing" | "pending_incoming" | "accepted"> {
+  const res = await pool.query<{ user_id_a: string; user_id_b: string; status: string }>(
+    `SELECT user_id_a, user_id_b, status FROM friendships
+     WHERE (user_id_a = $1 AND user_id_b = $2) OR (user_id_a = $2 AND user_id_b = $1)`,
+    [userId, otherUserId],
+  );
+  if (!res.rows.length) return "none";
+  const row = res.rows[0]!;
+  if (row.status === "accepted") return "accepted";
+  if (row.user_id_a === userId) return "pending_outgoing";
+  return "pending_incoming";
+}
+
+export type DbUserFull = {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  telegram: string | null;
+  phone: string | null;
+  contact_email: string | null;
+};
 
 export async function getUser(
   pool: Pool,
   userId: string,
-): Promise<{ user_id: string; display_name: string | null; avatar_url: string | null; created_at: string } | null> {
-  const res = await pool.query<{ user_id: string; display_name: string | null; avatar_url: string | null; created_at: string }>(
-    `SELECT user_id, display_name, avatar_url, created_at FROM users WHERE user_id = $1`,
+): Promise<DbUserFull | null> {
+  const res = await pool.query<DbUserFull>(
+    `SELECT user_id, display_name, avatar_url, created_at, telegram, phone, contact_email
+     FROM users WHERE user_id = $1`,
     [userId],
   );
   return res.rows[0] || null;
@@ -426,10 +635,24 @@ export async function acceptFriendRequest(pool: Pool, userId: string, friendId: 
 export async function getUserFriends(
   pool: Pool,
   userId: string,
-): Promise<{ user_id: string; display_name: string | null; avatar_url: string | null }[]> {
-  const res = await pool.query<{ user_id: string; display_name: string | null; avatar_url: string | null }>(
+): Promise<{
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  telegram: string | null;
+  phone: string | null;
+  contact_email: string | null;
+}[]> {
+  const res = await pool.query<{
+    user_id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    telegram: string | null;
+    phone: string | null;
+    contact_email: string | null;
+  }>(
     `
-    SELECT u.user_id, u.display_name, u.avatar_url
+    SELECT u.user_id, u.display_name, u.avatar_url, u.telegram, u.phone, u.contact_email
     FROM friendships f
     JOIN users u ON (
       (f.user_id_a = $1 AND f.user_id_b = u.user_id) OR

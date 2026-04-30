@@ -52,3 +52,18 @@ export async function serverFetch<T>(
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
+
+// Безопасный вариант: при ошибке возвращает fallback вместо исключения.
+// Для опциональных данных, чтобы страница не падала из-за упавшего endpoint'а.
+export async function safeServerFetch<T>(
+  path: string,
+  fallback: T,
+  options?: ServerFetchOptions,
+): Promise<T> {
+  try {
+    return await serverFetch<T>(path, options);
+  } catch (err) {
+    console.warn(`[safeServerFetch] fallback for ${path}:`, (err as Error).message);
+    return fallback;
+  }
+}

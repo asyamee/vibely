@@ -6,6 +6,7 @@ import { useUserStore } from "@/shared/store/userStore";
 import { getPlaylist, getRandomTracks, saveRatings } from "@/shared/api/ratings.api";
 import type { PlaylistResponse, PlaylistTrackItem, RatingItem } from "@/shared/api/ratings.api";
 import { Button } from "@/shared/ui/Button/Button";
+import { BackButton } from "@/shared/ui/BackButton/BackButton";
 import styles from "./ModelTrainPage.module.css";
 
 const MAIN_PLAYLIST_LIMIT = 25;
@@ -133,6 +134,7 @@ export const ModelTrainPage: React.FC = () => {
   if (phase === "input") {
     return (
       <div className={styles.container}>
+        <BackButton fallbackHref="/" />
         <div className={styles.card}>
           <h1 className={styles.title}>Обучение модели</h1>
           <p className={styles.description}>

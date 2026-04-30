@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
-import axios from "axios";
 import { getPlaylistByUUID } from "../api/get-playlists-by-uuid.js";
 import {
+  addUserPlaylistRecord,
   exportEventsForTraining,
   getOrCreateArtistInternalId,
   getOrCreateGenreInternalId,
@@ -9,8 +9,8 @@ import {
   getPool,
   insertUserEvent,
   upsertUser,
-  upsertUserEmbedding,
 } from "../db/postgres.js";
+import { computeAndSaveEmbedding } from "../services/embedding-service.js";
 
 type Stars = 1 | 2 | 3 | 4 | 5;
 
@@ -77,8 +77,11 @@ export const saveRatings = (req: Request, res: Response) => {
       // userId из JWT, плейлист грузим только для контента
       await getPlaylistByUUID(body.mainPlaylistUuid);
 
-      // Upsert user profile with default values
+      // Не передаём displayName/avatar — фикс upsertUser теперь не затирает их
       await upsertUser(client as any, userId);
+
+      // Регистрируем основной плейлист (учитывается в обучении)
+      await addUserPlaylistRecord(client, userId, body.mainPlaylistUuid, null, true);
 
       for (const r of body.ratings) {
         const rating = starsToRating(r.stars);
@@ -131,55 +134,6 @@ export const saveRatings = (req: Request, res: Response) => {
       .json({ message: "Ошибка записи рейтингов в Postgres" });
   });
 };
-
-async function computeAndSaveEmbedding(
-  pool: InstanceType<typeof import("pg").Pool>,
-  userId: string,
-): Promise<void> {
-  try {
-    // 1. Загрузить историю пользователя из user_events
-    const result = await pool.query(
-      `SELECT ue.track_id, ue.genre_id, ue.artist_ids, ue.rating
-       FROM user_events ue WHERE ue.user_id = $1`,
-      [userId],
-    );
-
-    if (result.rows.length === 0) {
-      console.log(`No events found for user ${userId}`);
-      return;
-    }
-
-    // 2. Подготовить payload для AI-сервиса
-    const tracks = result.rows.map(
-      (r: {
-        track_id: number;
-        genre_id: number;
-        artist_ids: number[];
-        rating: number;
-      }) => ({
-        id: r.track_id,
-        genre_id: r.genre_id,
-        artist_ids: r.artist_ids,
-        rating: r.rating,
-      }),
-    );
-
-    // 3. Вызвать AI-сервис
-    const aiUrl = process.env.AI_SERVICE_URL || "http://localhost:8000";
-    const response = await axios.post(`${aiUrl}/compute-embedding`, {
-      user_id: userId,
-      tracks,
-    }, { timeout: 10_000 });
-
-    const embedding: number[] = response.data.embedding;
-
-    // 4. Сохранить в postgres
-    await upsertUserEmbedding(pool, userId, embedding);
-    console.log(`Embedding computed and saved for user ${userId}`);
-  } catch (err) {
-    console.error(`Failed to compute embedding for user ${userId}:`, err);
-  }
-}
 
 export const exportTrainingJsonl = (req: Request, res: Response) => {
   const pool = getPool();

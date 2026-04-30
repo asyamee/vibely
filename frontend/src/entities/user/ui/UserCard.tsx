@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { Heart, UserRound, ExternalLink } from "lucide-react";
 import { GenreTag } from "@/shared/ui/GenreTag/GenreTag";
 import styles from "./UserCard.module.css";
@@ -22,13 +23,17 @@ export const UserCard: React.FC<UserCardProps> = ({
   return (
     <div className={styles.card}>
       <div className={styles.header}>
-        <img
-          src={user.avatarUrl}
-          alt={user.displayName || user.userId}
-          className={styles.avatar}
-        />
+        <Link href={`/users/${user.userId}`} className={styles.avatarLink}>
+          <img
+            src={user.avatarUrl}
+            alt={user.displayName || user.userId}
+            className={styles.avatar}
+          />
+        </Link>
         <div className={styles.info}>
-          <h3 className={styles.name}>{user.displayName || user.userId}</h3>
+          <Link href={`/users/${user.userId}`} className={styles.nameLink}>
+            <h3 className={styles.name}>{user.displayName || user.userId}</h3>
+          </Link>
           {user.genres && user.genres.length > 0 && (
             <div className={styles.genreList}>
               {user.genres.slice(0, 3).map((genre) => (

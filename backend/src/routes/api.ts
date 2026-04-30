@@ -12,16 +12,26 @@ import {
   listJsonlFiles,
 } from "../controllers/jsonl-export-controller.js";
 import {
+  changePassword,
+  deleteAccount,
   getProfile,
   updateProfile,
   upsertUserProfile,
   updateUserEmbedding,
 } from "../controllers/users-controller.js";
 import {
-  getFriends,
-  sendFriendRequest,
   acceptFriend,
+  getFriends,
+  listPendingRequests,
+  rejectFriend,
+  removeFriend,
+  sendFriendRequest,
 } from "../controllers/friends-controller.js";
+import {
+  addPlaylist,
+  listMyPlaylists,
+  removePlaylist,
+} from "../controllers/playlists-controller.js";
 import { register, login, refresh, logout, getMe } from "../controllers/auth-controller.js";
 import { getRandomTracksHandler } from "../controllers/tracks-controller.js";
 import { requireAuth, requireSelf, requireAdmin } from "../middleware/auth.middleware.js";
@@ -66,10 +76,22 @@ router.post("/users/:userId/upsert", requireAuth, requireSelf, upsertUserProfile
 // Embedding обновляется из скрипта переобучения, не требует requireSelf
 router.post("/users/:userId/embedding", requireAuth, updateUserEmbedding);
 
+// Безопасность (только владелец)
+router.post("/users/:userId/password", requireAuth, requireSelf, changePassword);
+router.delete("/users/:userId", requireAuth, requireSelf, deleteAccount);
+
 // Система друзей (защищённая)
 router.get("/users/:userId/friends", requireAuth, getFriends);
+router.get("/users/:userId/friends/requests", requireAuth, requireSelf, listPendingRequests);
 router.post("/users/:userId/friends/request", requireAuth, requireSelf, sendFriendRequest);
 router.put("/users/:userId/friends/:friendId/accept", requireAuth, requireSelf, acceptFriend);
+router.put("/users/:userId/friends/:friendId/reject", requireAuth, requireSelf, rejectFriend);
+router.delete("/users/:userId/friends/:friendId", requireAuth, requireSelf, removeFriend);
+
+// Учтённые плейлисты (только владелец)
+router.get("/users/:userId/playlists", requireAuth, requireSelf, listMyPlaylists);
+router.post("/users/:userId/playlists", requireAuth, requireSelf, addPlaylist);
+router.delete("/users/:userId/playlists/:playlistUuid", requireAuth, requireSelf, removePlaylist);
 
 // Admin (защищённый + requireAdmin)
 router.get("/admin/stats", requireAuth, requireAdmin, getAdminStats);

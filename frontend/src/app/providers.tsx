@@ -1,20 +1,23 @@
 "use client";
 
 import { ReactNode, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useUserStore } from "@/shared/store/userStore";
 import { getMe } from "@/shared/api/auth.api";
 
+const PUBLIC_ROUTES = ["/login", "/register"];
+
 export function Providers({ children }: { children: ReactNode }) {
   const hasHydrated = useUserStore((s) => s.hasHydrated);
+  const pathname = usePathname() || "/";
   const triedRef = useRef(false);
 
   useEffect(() => {
     if (!hasHydrated || triedRef.current) return;
+    if (PUBLIC_ROUTES.includes(pathname)) return;
+
     triedRef.current = true;
 
-    // Cookie accessToken/refreshToken браузер прикрепит автоматически (withCredentials).
-    // Если access-cookie валидна — сразу получим профиль; если истекла — axios-интерсептор
-    // сходит за refresh; если refresh упал — интерсептор отправит на /login.
     getMe()
       .then((me) => {
         useUserStore.getState().setUserId(me.userId);
@@ -22,7 +25,7 @@ export function Providers({ children }: { children: ReactNode }) {
       .catch(() => {
         useUserStore.getState().clearUser();
       });
-  }, [hasHydrated]);
+  }, [hasHydrated, pathname]);
 
   return <>{children}</>;
 }
