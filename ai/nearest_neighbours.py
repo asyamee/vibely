@@ -1,5 +1,5 @@
+
 import numpy as np
-from typing import Dict, List, Tuple
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -8,9 +8,9 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 def find_nearest_users(
     target_embedding: np.ndarray,
-    all_embeddings: Dict[str, np.ndarray],
+    all_embeddings: dict[str, np.ndarray],
     top_k: int = 10,
-) -> List[Tuple[str, float]]:
+) -> list[tuple[str, float]]:
     result = []
 
     for user_id, emb in all_embeddings.items():

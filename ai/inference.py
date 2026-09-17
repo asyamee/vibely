@@ -1,22 +1,21 @@
-from typing import Dict, List
 
 import numpy as np
 import torch
 
 try:
-    from .nearest_neighbours import cosine_similarity  # noqa: F401  (re-export)
+    from .nearest_neighbours import cosine_similarity
 except ImportError:
     from nearest_neighbours import cosine_similarity  # noqa: F401
 
 
-def pad_artists(artist_lists: List[List[int]], pad_value: int = 0) -> List[List[int]]:
+def pad_artists(artist_lists: list[list[int]], pad_value: int = 0) -> list[list[int]]:
     if not artist_lists:
         return []
     max_len = max(len(a) for a in artist_lists)
     return [a + [pad_value] * (max_len - len(a)) for a in artist_lists]
 
 
-def build_user_embedding(model, user_history: List[Dict], device: str = None) -> np.ndarray:
+def build_user_embedding(model, user_history: list[dict], device: str | None = None) -> np.ndarray:
     """
     Строит нормализованный вектор пользователя из его истории прослушиваний.
 

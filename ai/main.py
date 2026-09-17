@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Dict
 
 import numpy as np
 import torch
@@ -48,7 +47,7 @@ def main() -> None:
     model.eval()
 
     users = build_synthetic_users()
-    embeddings: Dict[str, np.ndarray] = {
+    embeddings: dict[str, np.ndarray] = {
         uid: build_user_embedding(model, hist, device=device)
         for uid, hist in users.items()
     }

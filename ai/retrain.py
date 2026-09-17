@@ -7,12 +7,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import sys
 
-import numpy as np
 import requests
 import torch
 
@@ -110,7 +108,7 @@ def update_user_embeddings(
         logger.info("Updated embeddings for %d users", updated_count)
         return updated_count
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("Failed to update embeddings: %s", e)
         return 0
 

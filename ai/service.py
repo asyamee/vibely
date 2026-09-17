@@ -10,8 +10,9 @@ import time
 import traceback
 
 from dotenv import load_dotenv
+
 load_dotenv()
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 import numpy as np
 import torch
@@ -91,20 +92,18 @@ _train_thread: threading.Thread | None = None
 class TrackPayload(BaseModel):
     id: int = Field(..., ge=0)
     genre_id: int = Field(..., ge=0)
-    artist_ids: List[int] = Field(..., min_length=1)
-    liked: Optional[
-        Literal["strong_like", "like", "neutral", "dislike", "strong_dislike"]
-    ] = None
+    artist_ids: list[int] = Field(..., min_length=1)
+    liked: Literal["strong_like", "like", "neutral", "dislike", "strong_dislike"] | None = None
 
 
 class RegisterUserRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
-    tracks: List[TrackPayload] = Field(..., min_length=1)
+    tracks: list[TrackPayload] = Field(..., min_length=1)
 
 
 class UserEmbeddingResponse(BaseModel):
     user_id: str
-    embedding: List[float]
+    embedding: list[float]
 
 
 class Neighbor(BaseModel):
@@ -114,23 +113,23 @@ class Neighbor(BaseModel):
 
 class NearestUsersResponse(BaseModel):
     user_id: str
-    neighbors: List[Neighbor]
+    neighbors: list[Neighbor]
 
 
 class ComputeEmbeddingTrack(BaseModel):
     id: int = Field(..., ge=0)
     genre_id: int = Field(..., ge=0)
-    artist_ids: List[int] = Field(..., min_length=1)
+    artist_ids: list[int] = Field(..., min_length=1)
     rating: float
 
 
 class ComputeEmbeddingRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
-    tracks: List[ComputeEmbeddingTrack] = Field(..., min_length=1)
+    tracks: list[ComputeEmbeddingTrack] = Field(..., min_length=1)
 
 
 class RetrainRequest(BaseModel):
-    events_jsonl: Optional[str] = None
+    events_jsonl: str | None = None
     epochs: int = Field(50, ge=1, le=500)
     diversity_weight: float = Field(0.1, ge=0.0, le=1.0)
 
@@ -192,7 +191,7 @@ def _startup() -> None:
             "Run: python train.py  (or python retrain.py --backend-url ...)"
         ) from e
 
-    app.state.user_embeddings: Dict[str, np.ndarray] = {}
+    app.state.user_embeddings: dict[str, np.ndarray] = {}
     logger.info("Model loaded: tracks=%d, artists=%d, genres=%d", NUM_TRACKS, NUM_ARTISTS, NUM_GENRES)
 
 
@@ -253,7 +252,7 @@ def _retrain_bg(events_jsonl: str | None, epochs: int, diversity_weight: float) 
 
         _train_state.finish(True)
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _train_state.add_log(f"ERROR: {exc}\n{traceback.format_exc()}")
         _train_state.finish(False)
     finally:
@@ -292,7 +291,7 @@ def _validate_ids(payload: RegisterUserRequest) -> None:
                 raise HTTPException(status_code=400, detail="artist id out of range")
 
 
-def _liked_to_rating(liked: Optional[str]) -> float:
+def _liked_to_rating(liked: str | None) -> float:
     if liked == "strong_like":
         return 1.0
     if liked == "like":
@@ -304,7 +303,7 @@ def _liked_to_rating(liked: Optional[str]) -> float:
     return -0.1
 
 
-def _payload_to_history(payload: RegisterUserRequest) -> List[Dict]:
+def _payload_to_history(payload: RegisterUserRequest) -> list[dict]:
     return [
         {
             "track_id": t.id,
@@ -317,7 +316,7 @@ def _payload_to_history(payload: RegisterUserRequest) -> List[Dict]:
 
 
 @app.get("/health")
-def health() -> Dict[str, str]:
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
@@ -393,7 +392,7 @@ def compute_embedding(payload: ComputeEmbeddingRequest) -> UserEmbeddingResponse
 # ── Admin endpoints ──────────────────────────────────────────────────────────
 
 @app.get("/admin/stats")
-def admin_stats(x_admin_token: str = Header(default="")) -> Dict:
+def admin_stats(x_admin_token: str = Header(default="")) -> dict:
     _require_admin(x_admin_token)
     status, logs = _train_state.snapshot()
     return {
@@ -410,7 +409,7 @@ def admin_stats(x_admin_token: str = Header(default="")) -> Dict:
 def admin_retrain(
     payload: RetrainRequest,
     x_admin_token: str = Header(default=""),
-) -> Dict:
+) -> dict:
     _require_admin(x_admin_token)
     global _train_thread
     if _train_thread and _train_thread.is_alive():
@@ -426,7 +425,7 @@ def admin_retrain(
 
 
 @app.post("/admin/reload")
-def admin_reload(x_admin_token: str = Header(default="")) -> Dict:
+def admin_reload(x_admin_token: str = Header(default="")) -> dict:
     _require_admin(x_admin_token)
     try:
         _load_model_from_disk()

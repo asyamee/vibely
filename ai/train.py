@@ -4,7 +4,6 @@ import argparse
 import logging
 import os
 import random
-from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -24,7 +23,7 @@ def set_seed(seed: int = 42) -> None:
     torch.manual_seed(seed)
 
 
-def build_synthetic_users() -> Dict[str, List[Dict]]:
+def build_synthetic_users() -> dict[str, list[dict]]:
     return {
         "user_pop_1": [
             {"track_id": 1, "genre_id": 1, "artist_ids": [1], "rating": 1.0},
@@ -77,7 +76,7 @@ def build_synthetic_users() -> Dict[str, List[Dict]]:
     }
 
 
-def split_pos_neg(history: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+def split_pos_neg(history: list[dict]) -> tuple[list[dict], list[dict]]:
     positives = [x for x in history if x["rating"] > 0]
     negatives = [x for x in history if x["rating"] < 0]
     return positives, negatives
@@ -85,19 +84,19 @@ def split_pos_neg(history: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
 
 def sample_bpr_loss(
     model,
-    users: Dict[str, List[Dict]],
-    user_ids: List[str],
+    users: dict[str, list[dict]],
+    user_ids: list[str],
     device: str,
     diversity_weight: float = 0.1,
-) -> Optional[torch.Tensor]:
+) -> torch.Tensor | None:
     """
     BPR loss + diversity regularization.
 
     Diversity loss = среднее попарное косинусное сходство между векторами
     пользователей в батче. Минимизация разталкивает их по гиперсфере.
     """
-    losses: List[torch.Tensor] = []
-    user_vecs: List[torch.Tensor] = []
+    losses: list[torch.Tensor] = []
+    user_vecs: list[torch.Tensor] = []
     all_user_ids = list(users.keys())
 
     for uid in user_ids:
@@ -165,7 +164,7 @@ def sample_bpr_loss(
     return bpr_loss
 
 
-def get_max_ids_from_events(events: List[Dict]) -> Tuple[int, int, int]:
+def get_max_ids_from_events(events: list[dict]) -> tuple[int, int, int]:
     max_track = max_artist = max_genre = 0
     for ev in events:
         max_track = max(max_track, ev["track_id"])
@@ -182,7 +181,7 @@ def train_model(
     patience: int = 5,
     min_lr: float = 1e-5,
     model_path: str = "user_encoder.pt",
-    data_path: Optional[str] = None,
+    data_path: str | None = None,
     num_tracks: int = 500_000,
     num_artists: int = 100_000,
     num_genres: int = 64,
