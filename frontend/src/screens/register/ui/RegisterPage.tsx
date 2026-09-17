@@ -14,7 +14,11 @@ import styles from "./RegisterPage.module.css";
 const registerSchema = z
   .object({
     email: z.string().email("Введи корректный email"),
-    password: z.string().min(8, "Пароль минимум 8 символов"),
+    password: z
+      .string()
+      .min(8, "Пароль минимум 8 символов")
+      .regex(/[a-zA-Zа-яА-Я]/, "Пароль должен содержать хотя бы одну букву")
+      .regex(/\d/, "Пароль должен содержать хотя бы одну цифру"),
     confirmPassword: z.string(),
     displayName: z.string().optional(),
   })

@@ -73,7 +73,11 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
-    const data = (await refreshRes.json().catch(() => null)) as { accessToken?: string } | null;
+    const raw: unknown = await refreshRes.json().catch(() => null);
+    const data =
+      raw && typeof raw === "object" && "accessToken" in raw && typeof (raw as Record<string, unknown>).accessToken === "string"
+        ? (raw as { accessToken: string })
+        : null;
     const setCookies = getSetCookies(refreshRes.headers);
     const newAccessToken = data?.accessToken ?? null;
     let newRefreshToken: string | null = null;

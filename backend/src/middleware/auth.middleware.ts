@@ -1,7 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "dev-access-secret";
+if (!process.env.JWT_ACCESS_SECRET) throw new Error("JWT_ACCESS_SECRET environment variable is required");
+const ACCESS_SECRET: string = process.env.JWT_ACCESS_SECRET;
 
 declare global {
   namespace Express {

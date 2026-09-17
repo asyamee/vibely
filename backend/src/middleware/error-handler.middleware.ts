@@ -20,10 +20,17 @@ export const errorHandler = (
   // Определение статус-кода ошибки
   const statusCode = err.statusCode || 500;
 
-  // Подготовка ответа с ошибкой
+  // В production скрываем детали неожиданных (5xx) ошибок — они могут содержать
+  // имена таблиц, фрагменты SQL и прочую внутреннюю информацию.
+  const isExpectedError = err.statusCode !== undefined && err.statusCode < 500;
+  const message =
+    isExpectedError || process.env.NODE_ENV === "development"
+      ? err.message || "Internal Server Error"
+      : "Internal Server Error";
+
   const response = {
     success: false,
-    message: err.message || "Internal Server Error",
+    message,
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   };
 
