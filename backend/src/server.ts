@@ -51,7 +51,7 @@ const limiter = rateLimit({
   max: AppConfig.rateLimit.max,
   standardHeaders: true,
   legacyHeaders: false,
-  // Не считаем дешёвые/частые служебные запросы.
+  // Не считаем дешёвые/частые служебные запросы (refresh имеет свой лимитер).
   skip: (req) =>
     req.path === "/health" ||
     req.path === "/api/auth/refresh" ||
@@ -69,6 +69,15 @@ const authLimiter = rateLimit({
 });
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
+
+// Rate-limiter для refresh — мягче, но не бесконечный (защита от token farming).
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/auth/refresh", refreshLimiter);
 
 // Логирование запросов
 app.use((req: Request, res: Response, next: NextFunction) => {

@@ -1,6 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_ROUTES = ["/login", "/register"];
+const ADMIN_ROUTES = ["/admin"];
+
+// Список admin user ID читается из env (серверная переменная, не NEXT_PUBLIC_).
+const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+/**
+ * Декодирует payload JWT без верификации подписи.
+ * Используется только для UX-проверки admin-доступа на фронте — не является security boundary.
+ * Реальная авторизация происходит на backend через requireAdmin middleware.
+ */
+function decodeJwtUserId(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1])) as { userId?: string };
+    return payload.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Проверяет, что пользователь из токена имеет доступ к admin-роутам. */
+function isAdminAccessDenied(pathname: string, accessToken: string): boolean {
+  const isAdminRoute = ADMIN_ROUTES.some((r) => pathname.startsWith(r));
+  if (!isAdminRoute || ADMIN_USER_IDS.length === 0) return false;
+  const userId = decodeJwtUserId(accessToken);
+  return !userId || !ADMIN_USER_IDS.includes(userId);
+}
 
 const BACKEND =
   process.env.BACKEND_INTERNAL_URL ||
@@ -31,7 +60,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (request.cookies.get("accessToken")) {
+  const existingAccessToken = request.cookies.get("accessToken")?.value;
+  if (existingAccessToken) {
+    if (isAdminAccessDenied(pathname, existingAccessToken)) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
     return NextResponse.next();
   }
 
@@ -48,7 +81,13 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
-    const data = (await refreshRes.json().catch(() => null)) as { accessToken?: string } | null;
+    const raw: unknown = await refreshRes.json().catch(() => null);
+    const isValidResponse =
+      raw !== null &&
+      typeof raw === "object" &&
+      "accessToken" in raw &&
+      typeof (raw as Record<string, unknown>).accessToken === "string";
+    const data = isValidResponse ? (raw as { accessToken: string }) : null;
     const setCookies = getSetCookies(refreshRes.headers);
     const newAccessToken = data?.accessToken ?? null;
     let newRefreshToken: string | null = null;
@@ -60,6 +99,10 @@ export async function middleware(request: NextRequest) {
     if (!newAccessToken) {
       // Backend не вернул токен — на всякий случай уходим на логин.
       return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    if (isAdminAccessDenied(pathname, newAccessToken)) {
+      return NextResponse.redirect(new URL("/", request.url));
     }
 
     // КРИТИЧНО: подменяем cookie прямо в текущем входящем запросе, чтобы Server Components

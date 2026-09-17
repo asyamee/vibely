@@ -13,8 +13,11 @@ import {
   upsertUser,
 } from "../db/postgres.js";
 
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "dev-access-secret";
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "dev-refresh-secret";
+if (!process.env.JWT_ACCESS_SECRET) throw new Error("JWT_ACCESS_SECRET environment variable is required");
+const ACCESS_SECRET: string = process.env.JWT_ACCESS_SECRET;
+
+if (!process.env.JWT_REFRESH_SECRET) throw new Error("JWT_REFRESH_SECRET environment variable is required");
+const REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET;
 const ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
 const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
 

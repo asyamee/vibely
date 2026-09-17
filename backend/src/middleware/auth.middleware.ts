@@ -1,7 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "dev-access-secret";
+if (!process.env.JWT_ACCESS_SECRET) throw new Error("JWT_ACCESS_SECRET environment variable is required");
+const ACCESS_SECRET: string = process.env.JWT_ACCESS_SECRET;
 
 declare global {
   namespace Express {
@@ -27,7 +28,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 
   try {
-    const payload = jwt.verify(token, ACCESS_SECRET) as TokenPayload;
+    const payload = jwt.verify(token, ACCESS_SECRET, { algorithms: ["HS256"] }) as TokenPayload;
     req.user = { userId: payload.userId };
     next();
   } catch (error) {
@@ -43,7 +44,10 @@ export function requireSelf(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
-const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS ?? "").split(",").filter(Boolean);
+const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (!req.user) {

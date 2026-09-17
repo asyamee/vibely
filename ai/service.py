@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import os
 import threading
 import time
+import traceback
 
 from dotenv import load_dotenv
+
 load_dotenv()
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 import numpy as np
 import torch
@@ -38,6 +41,12 @@ AI_ADMIN_TOKEN = os.getenv("AI_ADMIN_TOKEN", "")
 NUM_TRACKS = int(os.getenv("AI_NUM_TRACKS", "500000"))
 NUM_ARTISTS = int(os.getenv("AI_NUM_ARTISTS", "100000"))
 NUM_GENRES = int(os.getenv("AI_NUM_GENRES", "64"))
+
+# Блокировки для безопасного доступа из нескольких потоков.
+# _model_lock защищает app.state.model и глобальные NUM_*.
+# _embeddings_lock защищает app.state.user_embeddings.
+_model_lock = threading.RLock()
+_embeddings_lock = threading.RLock()
 
 # ── Admin training state ─────────────────────────────────────────────────────
 
@@ -83,20 +92,18 @@ _train_thread: threading.Thread | None = None
 class TrackPayload(BaseModel):
     id: int = Field(..., ge=0)
     genre_id: int = Field(..., ge=0)
-    artist_ids: List[int] = Field(..., min_length=1)
-    liked: Optional[
-        Literal["strong_like", "like", "neutral", "dislike", "strong_dislike"]
-    ] = None
+    artist_ids: list[int] = Field(..., min_length=1)
+    liked: Literal["strong_like", "like", "neutral", "dislike", "strong_dislike"] | None = None
 
 
 class RegisterUserRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
-    tracks: List[TrackPayload] = Field(..., min_length=1)
+    tracks: list[TrackPayload] = Field(..., min_length=1)
 
 
 class UserEmbeddingResponse(BaseModel):
     user_id: str
-    embedding: List[float]
+    embedding: list[float]
 
 
 class Neighbor(BaseModel):
@@ -106,23 +113,23 @@ class Neighbor(BaseModel):
 
 class NearestUsersResponse(BaseModel):
     user_id: str
-    neighbors: List[Neighbor]
+    neighbors: list[Neighbor]
 
 
 class ComputeEmbeddingTrack(BaseModel):
     id: int = Field(..., ge=0)
     genre_id: int = Field(..., ge=0)
-    artist_ids: List[int] = Field(..., min_length=1)
+    artist_ids: list[int] = Field(..., min_length=1)
     rating: float
 
 
 class ComputeEmbeddingRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
-    tracks: List[ComputeEmbeddingTrack] = Field(..., min_length=1)
+    tracks: list[ComputeEmbeddingTrack] = Field(..., min_length=1)
 
 
 class RetrainRequest(BaseModel):
-    events_jsonl: Optional[str] = None
+    events_jsonl: str | None = None
     epochs: int = Field(50, ge=1, le=500)
     diversity_weight: float = Field(0.1, ge=0.0, le=1.0)
 
@@ -144,22 +151,38 @@ def _load_model_from_disk() -> None:
 
     state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
     loaded_tracks, loaded_artists, loaded_genres = _get_model_params_from_state_dict(state_dict)
-    NUM_TRACKS = max(NUM_TRACKS, loaded_tracks)
-    NUM_ARTISTS = max(NUM_ARTISTS, loaded_artists)
-    NUM_GENRES = max(NUM_GENRES, loaded_genres)
 
+    # Читаем текущие размеры словарей под локом — retrain может менять их параллельно.
+    with _model_lock:
+        new_num_tracks = max(NUM_TRACKS, loaded_tracks)
+        new_num_artists = max(NUM_ARTISTS, loaded_artists)
+        new_num_genres = max(NUM_GENRES, loaded_genres)
+
+    # Строим модель вне лока — может занять время, инференс не блокируем.
     model = UserMusicEncoder(
-        num_tracks=NUM_TRACKS,
-        num_artists=NUM_ARTISTS,
-        num_genres=NUM_GENRES,
+        num_tracks=new_num_tracks,
+        num_artists=new_num_artists,
+        num_genres=new_num_genres,
     ).to(DEVICE)
     model.load_state_dict(state_dict)
     model.eval()
-    app.state.model = model
+
+    # Атомарный своп под локом — инференс видит либо старую, либо новую модель целиком.
+    with _model_lock:
+        NUM_TRACKS = new_num_tracks
+        NUM_ARTISTS = new_num_artists
+        NUM_GENRES = new_num_genres
+        app.state.model = model
 
 
 @app.on_event("startup")
 def _startup() -> None:
+    if not AI_ADMIN_TOKEN:
+        raise RuntimeError(
+            "AI_ADMIN_TOKEN env var is not set. "
+            "Set it to a strong secret before starting the service."
+        )
+
     try:
         _load_model_from_disk()
     except FileNotFoundError as e:
@@ -168,14 +191,15 @@ def _startup() -> None:
             "Run: python train.py  (or python retrain.py --backend-url ...)"
         ) from e
 
-    app.state.user_embeddings: Dict[str, np.ndarray] = {}
+    app.state.user_embeddings: dict[str, np.ndarray] = {}
     logger.info("Model loaded: tracks=%d, artists=%d, genres=%d", NUM_TRACKS, NUM_ARTISTS, NUM_GENRES)
 
 
 # ── Admin helpers ────────────────────────────────────────────────────────────
 
 def _require_admin(token: str) -> None:
-    if not AI_ADMIN_TOKEN or token != AI_ADMIN_TOKEN:
+    # hmac.compare_digest защищает от timing-атаки при переборе токена.
+    if not token or not hmac.compare_digest(token, AI_ADMIN_TOKEN):
         raise HTTPException(status_code=403, detail="Admin token required")
 
 
@@ -228,8 +252,8 @@ def _retrain_bg(events_jsonl: str | None, epochs: int, diversity_weight: float) 
 
         _train_state.finish(True)
 
-    except Exception as exc:
-        _train_state.add_log(f"ERROR: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        _train_state.add_log(f"ERROR: {exc}\n{traceback.format_exc()}")
         _train_state.finish(False)
     finally:
         train_logger.removeHandler(handler)
@@ -239,35 +263,35 @@ def _retrain_bg(events_jsonl: str | None, epochs: int, diversity_weight: float) 
 def _recompute_embeddings(data_path: str) -> None:
     events = load_events_from_jsonl(data_path)
     users = build_users_from_events(events)
+    with _model_lock:
+        model = app.state.model
     for user_id, history in users.items():
-        emb = build_user_embedding(app.state.model, history, device=DEVICE)
-        app.state.user_embeddings[user_id] = emb
+        emb = build_user_embedding(model, history, device=DEVICE)
+        with _embeddings_lock:
+            app.state.user_embeddings[user_id] = emb
     _train_state.add_log(f"INFO: Recomputed embeddings for {len(users)} users")
 
 
 # ── Public endpoints ─────────────────────────────────────────────────────────
 
 def _validate_ids(payload: RegisterUserRequest) -> None:
+    # Снимаем снапшот под локом чтобы не читать глобальные переменные
+    # в момент когда retrain их обновляет.
+    with _model_lock:
+        num_tracks = NUM_TRACKS
+        num_genres = NUM_GENRES
+        num_artists = NUM_ARTISTS
     for t in payload.tracks:
-        if t.id >= NUM_TRACKS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"track id {t.id} out of range (0..{NUM_TRACKS-1})",
-            )
-        if t.genre_id >= NUM_GENRES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"genre id {t.genre_id} out of range (0..{NUM_GENRES-1})",
-            )
+        if t.id >= num_tracks:
+            raise HTTPException(status_code=400, detail="track id out of range")
+        if t.genre_id >= num_genres:
+            raise HTTPException(status_code=400, detail="genre id out of range")
         for a in t.artist_ids:
-            if a < 0 or a >= NUM_ARTISTS:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"artist id {a} out of range (0..{NUM_ARTISTS-1})",
-                )
+            if a < 0 or a >= num_artists:
+                raise HTTPException(status_code=400, detail="artist id out of range")
 
 
-def _liked_to_rating(liked: Optional[str]) -> float:
+def _liked_to_rating(liked: str | None) -> float:
     if liked == "strong_like":
         return 1.0
     if liked == "like":
@@ -279,7 +303,7 @@ def _liked_to_rating(liked: Optional[str]) -> float:
     return -0.1
 
 
-def _payload_to_history(payload: RegisterUserRequest) -> List[Dict]:
+def _payload_to_history(payload: RegisterUserRequest) -> list[dict]:
     return [
         {
             "track_id": t.id,
@@ -292,7 +316,7 @@ def _payload_to_history(payload: RegisterUserRequest) -> List[Dict]:
 
 
 @app.get("/health")
-def health() -> Dict[str, str]:
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
@@ -300,8 +324,11 @@ def health() -> Dict[str, str]:
 def register_user(payload: RegisterUserRequest) -> UserEmbeddingResponse:
     _validate_ids(payload)
     history = _payload_to_history(payload)
-    embedding = build_user_embedding(app.state.model, history, device=DEVICE)
-    app.state.user_embeddings[payload.user_id] = embedding
+    with _model_lock:
+        model = app.state.model
+    embedding = build_user_embedding(model, history, device=DEVICE)
+    with _embeddings_lock:
+        app.state.user_embeddings[payload.user_id] = embedding
     return UserEmbeddingResponse(
         user_id=payload.user_id,
         embedding=embedding.astype(float).tolist(),
@@ -310,7 +337,8 @@ def register_user(payload: RegisterUserRequest) -> UserEmbeddingResponse:
 
 @app.get("/users/{user_id}/embedding", response_model=UserEmbeddingResponse)
 def get_user_embedding(user_id: str) -> UserEmbeddingResponse:
-    emb = app.state.user_embeddings.get(user_id)
+    with _embeddings_lock:
+        emb = app.state.user_embeddings.get(user_id)
     if emb is None:
         raise HTTPException(status_code=404, detail="user not found")
     return UserEmbeddingResponse(user_id=user_id, embedding=emb.astype(float).tolist())
@@ -324,10 +352,12 @@ def nearest_users(
 ) -> NearestUsersResponse:
     if mode != "cosine":
         raise HTTPException(status_code=400, detail="only cosine mode supported")
-    target = app.state.user_embeddings.get(user_id)
+    with _embeddings_lock:
+        target = app.state.user_embeddings.get(user_id)
+        # Снапшот словаря под локом — поиск соседей выполняется вне лока.
+        all_embs = {k: v for k, v in app.state.user_embeddings.items() if k != user_id}
     if target is None:
         raise HTTPException(status_code=404, detail="user not found")
-    all_embs = {k: v for k, v in app.state.user_embeddings.items() if k != user_id}
     neighbors = find_nearest_users(target, all_embs, top_k=top_k)
     return NearestUsersResponse(
         user_id=user_id,
@@ -347,8 +377,11 @@ def compute_embedding(payload: ComputeEmbeddingRequest) -> UserEmbeddingResponse
         }
         for t in payload.tracks
     ]
-    embedding = build_user_embedding(app.state.model, history, device=DEVICE)
-    app.state.user_embeddings[payload.user_id] = embedding
+    with _model_lock:
+        model = app.state.model
+    embedding = build_user_embedding(model, history, device=DEVICE)
+    with _embeddings_lock:
+        app.state.user_embeddings[payload.user_id] = embedding
     logger.info("Embedding for user_id=%s computed in %.3fs", payload.user_id, time.monotonic() - t0)
     return UserEmbeddingResponse(
         user_id=payload.user_id,
@@ -359,7 +392,7 @@ def compute_embedding(payload: ComputeEmbeddingRequest) -> UserEmbeddingResponse
 # ── Admin endpoints ──────────────────────────────────────────────────────────
 
 @app.get("/admin/stats")
-def admin_stats(x_admin_token: str = Header(default="")) -> Dict:
+def admin_stats(x_admin_token: str = Header(default="")) -> dict:
     _require_admin(x_admin_token)
     status, logs = _train_state.snapshot()
     return {
@@ -376,7 +409,7 @@ def admin_stats(x_admin_token: str = Header(default="")) -> Dict:
 def admin_retrain(
     payload: RetrainRequest,
     x_admin_token: str = Header(default=""),
-) -> Dict:
+) -> dict:
     _require_admin(x_admin_token)
     global _train_thread
     if _train_thread and _train_thread.is_alive():
@@ -392,7 +425,7 @@ def admin_retrain(
 
 
 @app.post("/admin/reload")
-def admin_reload(x_admin_token: str = Header(default="")) -> Dict:
+def admin_reload(x_admin_token: str = Header(default="")) -> dict:
     _require_admin(x_admin_token)
     try:
         _load_model_from_disk()

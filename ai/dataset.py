@@ -3,18 +3,18 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from typing import DefaultDict, Dict, Iterable, List
+from collections.abc import Iterable
 
 logger = logging.getLogger("vibely-ai")
 
-Event = Dict[str, object]
-UserHistory = List[Dict[str, object]]
+Event = dict[str, object]
+UserHistory = list[dict[str, object]]
 
 _REQUIRED_FIELDS = {"user_id", "track_id", "genre_id", "artist_ids", "rating"}
 
 
-def load_events_from_jsonl(path: str) -> List[Event]:
-    events: List[Event] = []
+def load_events_from_jsonl(path: str) -> list[Event]:
+    events: list[Event] = []
     skipped = 0
     with open(path, "r", encoding="utf-8") as f:
         for lineno, line in enumerate(f, 1):
@@ -41,8 +41,8 @@ def load_events_from_jsonl(path: str) -> List[Event]:
     return events
 
 
-def build_users_from_events(events: Iterable[Event]) -> Dict[str, UserHistory]:
-    users: DefaultDict[str, Dict[int, Dict]] = defaultdict(dict)
+def build_users_from_events(events: Iterable[Event]) -> dict[str, UserHistory]:
+    users: defaultdict[str, dict[int, dict]] = defaultdict(dict)
 
     total_events = 0
     for ev in events:
@@ -59,7 +59,7 @@ def build_users_from_events(events: Iterable[Event]) -> Dict[str, UserHistory]:
         # Дедупликация: при повторной оценке того же трека берём последнюю
         users[user_id][track_id] = item
 
-    result: Dict[str, UserHistory] = {}
+    result: dict[str, UserHistory] = {}
     filtered_users = 0
     for uid, track_map in users.items():
         history = list(track_map.values())

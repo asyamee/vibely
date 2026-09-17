@@ -73,8 +73,8 @@ router.get("/users/:userId/nearest", requireAuth, getSimilarUsers);
 router.get("/users/:userId/profile", requireAuth, getProfile);
 router.put("/users/:userId/profile", requireAuth, requireSelf, updateProfile);
 router.post("/users/:userId/upsert", requireAuth, requireSelf, upsertUserProfile);
-// Embedding обновляется из скрипта переобучения, не требует requireSelf
-router.post("/users/:userId/embedding", requireAuth, updateUserEmbedding);
+// Embedding обновляется скриптом переобучения от имени admin-пользователя
+router.post("/users/:userId/embedding", requireAuth, requireAdmin, updateUserEmbedding);
 
 // Безопасность (только владелец)
 router.post("/users/:userId/password", requireAuth, requireSelf, changePassword);
