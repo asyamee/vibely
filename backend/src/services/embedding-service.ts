@@ -1,6 +1,8 @@
 import axios from "axios";
 import type { Pool } from "pg";
 import { upsertUserEmbedding } from "../db/postgres.js";
+import { logger } from "../lib/logger.js";
+import { aiEmbeddingResponseSchema } from "../schemas/external.schema.js";
 
 export async function computeAndSaveEmbedding(pool: Pool, userId: string): Promise<void> {
   try {
@@ -11,7 +13,7 @@ export async function computeAndSaveEmbedding(pool: Pool, userId: string): Promi
     );
 
     if (result.rows.length === 0) {
-      console.log(`No events for user ${userId}, skipping embedding`);
+      logger.info({ userId }, "computeAndSaveEmbedding: no events, skipping");
       return;
     }
 
@@ -28,11 +30,12 @@ export async function computeAndSaveEmbedding(pool: Pool, userId: string): Promi
       { user_id: userId, tracks },
       { timeout: 15_000 },
     );
-    const embedding: number[] = response.data.embedding;
+    const parsed = aiEmbeddingResponseSchema.parse(response.data);
+    const embedding: number[] = parsed.embedding;
     await upsertUserEmbedding(pool, userId, embedding);
-    console.log(`Embedding saved for user ${userId}`);
+    logger.info({ userId, embeddingDim: embedding.length }, "computeAndSaveEmbedding: saved");
   } catch (err) {
-    console.error(`Failed to compute embedding for ${userId}:`, err);
+    logger.error({ userId, err }, "computeAndSaveEmbedding: failed");
     throw err;
   }
 }
