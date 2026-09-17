@@ -1,27 +1,19 @@
-# Deploy — обновление production-окружения на сервере.
+# Deploy Staging — обновление staging-окружения на сервере.
 #
-# Триггеры:
-#   1. Push в release (автоматический деплой после мержа main → release)
-#   2. Вручную из UI Actions с указанием тега образа (для отката или хотфикса)
-#
-# Что делает:
-#   1. Подключается по SSH к серверу.
-#   2. Логинится в ghcr.io (нужно если образы приватные).
-#   3. Тянет новые образы по тегу.
-#   4. Перезапускает сервисы через docker compose up -d.
-#   5. Чистит старые образы и неиспользуемые слои.
+# Триггер: repository_dispatch от build.yml (после успешной сборки образов в main).
+# Также можно запустить вручную.
 #
 # Требуемые GitHub Secrets:
 #   SSH_HOST    — IP или hostname сервера
 #   SSH_USER    — пользователь для SSH (например, deploy)
-#   SSH_KEY     — приватный SSH-ключ в формате OpenSSH (содержимое id_ed25519)
-#   GHCR_PAT    — Personal Access Token с правом read:packages (если репо приватный).
+#   SSH_KEY     — приватный SSH-ключ
+#   GHCR_PAT    — Personal Access Token с правом read:packages (если репо приватный)
 
-name: Deploy Production
+name: Deploy Staging
 
 on:
-  push:
-    branches: [release]
+  repository_dispatch:
+    types: [deploy]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -31,15 +23,15 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to production
+    name: Deploy to staging
     runs-on: ubuntu-latest
 
     steps:
       - name: Determine image tag
         id: tag
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "tag=${{ github.event.client_payload.image_tag }}" >> $GITHUB_OUTPUT
           else
             echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
           fi
@@ -53,7 +45,7 @@ jobs:
           envs: IMAGE_TAG,GHCR_OWNER,GHCR_PAT,GITHUB_ACTOR
           script: |
             set -e
-            cd /opt/vibely
+            cd /opt/vibely-staging
 
             if [ -n "$GHCR_PAT" ]; then
               echo "$GHCR_PAT" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
@@ -63,14 +55,14 @@ jobs:
             export GHCR_OWNER="$GHCR_OWNER"
 
             echo "Pulling images with tag: $IMAGE_TAG"
-            docker compose -f docker-compose.deploy.yml --env-file .env.production pull
+            docker compose -f docker-compose.deploy.yml --env-file .env.staging pull
 
             echo "Restarting services..."
-            docker compose -f docker-compose.deploy.yml --env-file .env.production up -d --remove-orphans
+            docker compose -f docker-compose.deploy.yml --env-file .env.staging up -d --remove-orphans
 
             docker image prune -af --filter "until=24h"
 
-            echo "Production deployed successfully"
+            echo "Staging deployed successfully"
         env:
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
           GHCR_OWNER: ${{ github.repository_owner }}
@@ -81,11 +73,11 @@ jobs:
         run: |
           for i in 1 2 3 4 5; do
             sleep 10
-            if curl -fsS -o /dev/null -w "%{http_code}" "https://${{ vars.PUBLIC_DOMAIN || secrets.SSH_HOST }}/" | grep -qE "^(200|301|302)$"; then
-              echo "Production is up"
+            if curl -fsS -o /dev/null -w "%{http_code}" "https://${{ vars.STAGING_DOMAIN || secrets.SSH_HOST }}:3100/" | grep -qE "^(200|301|302)$"; then
+              echo "Staging is up"
               exit 0
             fi
             echo "Attempt $i failed, retrying..."
           done
-          echo "Production not responding after deploy"
+          echo "Staging not responding after deploy"
           exit 1
