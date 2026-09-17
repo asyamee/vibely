@@ -51,9 +51,10 @@ const limiter = rateLimit({
   max: AppConfig.rateLimit.max,
   standardHeaders: true,
   legacyHeaders: false,
-  // Не считаем дешёвые/частые служебные запросы.
+  // Не считаем дешёвые/частые служебные запросы (refresh имеет свой лимитер).
   skip: (req) =>
     req.path === "/health" ||
+    req.path === "/api/auth/refresh" ||
     req.path === "/api/auth/me",
 });
 app.use(limiter);

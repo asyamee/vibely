@@ -153,7 +153,7 @@ def _load_model_from_disk() -> None:
     state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
     loaded_tracks, loaded_artists, loaded_genres = _get_model_params_from_state_dict(state_dict)
 
-    # Вычисляем новые размеры словарей без лока — это чистые вычисления.
+    # Читаем текущие размеры словарей под локом — retrain может менять их параллельно.
     with _model_lock:
         new_num_tracks = max(NUM_TRACKS, loaded_tracks)
         new_num_artists = max(NUM_ARTISTS, loaded_artists)

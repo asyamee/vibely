@@ -1,5 +1,13 @@
 import type { NextConfig } from "next";
 
+const backendOrigin = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001").origin;
+  } catch {
+    return "http://localhost:3001";
+  }
+})();
+
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -9,10 +17,10 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://avatars.yandex.net",
-      `connect-src 'self' ${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"}`,
+      `connect-src 'self' ${backendOrigin}`,
       "font-src 'self'",
       "frame-ancestors 'none'",
     ].join("; "),

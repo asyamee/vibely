@@ -268,7 +268,7 @@ export async function batchInsertUserEvents(
       ev.user_id, ev.playlist_uuid, ev.track_id, ev.genre_id,
       ev.artist_ids, ev.rating, ev.ts, ev.include_in_training !== false,
     );
-    return `($${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8})`;
+    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8})`;
   });
   await db.query(
     `INSERT INTO user_events

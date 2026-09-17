@@ -85,15 +85,26 @@ export const saveRatings = async (req: Request, res: Response) => {
 
     await batchInsertUserEvents(
       client,
-      body.ratings.map((r) => ({
-        user_id: userId,
-        playlist_uuid: r.playlistUuid,
-        track_id: trackIdMap.get(r.trackId)!,
-        genre_id: genreIdMap.get(r.trackGenre ?? "unknown")!,
-        artist_ids: r.artistsIds.map((a) => artistIdMap.get(a)!),
-        rating: starsToRating(r.stars),
-        ts,
-      })),
+      body.ratings.map((r) => {
+        const trackId = trackIdMap.get(r.trackId);
+        const genreId = genreIdMap.get(r.trackGenre ?? "unknown");
+        if (trackId === undefined || genreId === undefined) {
+          throw Object.assign(new Error("ID mapping failed: missing track or genre"), { statusCode: 500 });
+        }
+        return {
+          user_id: userId,
+          playlist_uuid: r.playlistUuid,
+          track_id: trackId,
+          genre_id: genreId,
+          artist_ids: r.artistsIds.map((a) => {
+            const aid = artistIdMap.get(a);
+            if (aid === undefined) throw Object.assign(new Error("ID mapping failed: missing artist"), { statusCode: 500 });
+            return aid;
+          }),
+          rating: starsToRating(r.stars),
+          ts,
+        };
+      }),
     );
 
     await client.query("COMMIT");
