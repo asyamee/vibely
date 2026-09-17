@@ -2,12 +2,12 @@ import type { Request, Response } from "express";
 import { getPlaylistByUUID } from "../api/get-playlists-by-uuid.js";
 import {
   addUserPlaylistRecord,
+  batchGetOrCreateArtistIds,
+  batchGetOrCreateGenreIds,
+  batchGetOrCreateTrackIds,
+  batchInsertUserEvents,
   exportEventsForTraining,
-  getOrCreateArtistInternalId,
-  getOrCreateGenreInternalId,
-  getOrCreateTrackInternalId,
   getPool,
-  insertUserEvent,
   upsertUser,
 } from "../db/postgres.js";
 import { computeAndSaveEmbedding } from "../services/embedding-service.js";
@@ -46,7 +46,7 @@ const starsToRating = (stars: Stars): number => {
   }
 };
 
-export const saveRatings = (req: Request, res: Response) => {
+export const saveRatings = async (req: Request, res: Response) => {
   const body = req.body as SaveRatingsBody;
   const userId = req.user?.userId;
 
@@ -54,105 +54,73 @@ export const saveRatings = (req: Request, res: Response) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  if (
-    !body?.mainPlaylistUuid ||
-    !Array.isArray(body.ratings) ||
-    body.ratings.length === 0
-  ) {
-    return res
-      .status(400)
-      .json({
-        message: "mainPlaylistUuid и непустой список ratings обязательны",
-      });
+  if (!body?.mainPlaylistUuid || !Array.isArray(body.ratings) || body.ratings.length === 0) {
+    return res.status(400).json({ message: "mainPlaylistUuid и непустой список ratings обязательны" });
   }
 
   const pool = getPool();
   const ts = new Date().toISOString();
+  const client = await pool.connect();
 
-  (async () => {
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
+  try {
+    await client.query("BEGIN");
 
-      // userId из JWT, плейлист грузим только для контента
-      await getPlaylistByUUID(body.mainPlaylistUuid);
+    await getPlaylistByUUID(body.mainPlaylistUuid);
+    await upsertUser(client as any, userId);
+    await addUserPlaylistRecord(client, userId, body.mainPlaylistUuid, null, true);
 
-      // Не передаём displayName/avatar — фикс upsertUser теперь не затирает их
-      await upsertUser(client as any, userId);
+    // Собираем уникальные треки, жанры и артистов — три batch-запроса вместо ~300.
+    const uniqueTracks = [
+      ...new Map(body.ratings.map((r) => [r.trackId, r])).values(),
+    ].map((r) => ({ externalId: r.trackId, title: r.title, coverUrl: r.coverUrl ?? undefined }));
 
-      // Регистрируем основной плейлист (учитывается в обучении)
-      await addUserPlaylistRecord(client, userId, body.mainPlaylistUuid, null, true);
+    const uniqueGenres = [...new Set(body.ratings.map((r) => r.trackGenre ?? "unknown"))];
+    const uniqueArtistIds = [...new Set(body.ratings.flatMap((r) => r.artistsIds))];
 
-      for (const r of body.ratings) {
-        const rating = starsToRating(r.stars);
+    const [trackIdMap, genreIdMap, artistIdMap] = await Promise.all([
+      batchGetOrCreateTrackIds(client, uniqueTracks),
+      batchGetOrCreateGenreIds(client, uniqueGenres),
+      batchGetOrCreateArtistIds(client, uniqueArtistIds),
+    ]);
 
-        const trackInternal = await getOrCreateTrackInternalId(client, r.trackId, {
-          title: r?.title || '',
-          coverUrl: r?.coverUrl || '',
-          artistIdsExternal: r?.artistsIds,
-        });
-        const genreInternal = await getOrCreateGenreInternalId(
-          client,
-          r.trackGenre ?? "unknown",
-        );
-        const artistsInternal = await Promise.all(
-          r.artistsIds.map((a) => getOrCreateArtistInternalId(client, a)),
-        );
+    await batchInsertUserEvents(
+      client,
+      body.ratings.map((r) => ({
+        user_id: userId,
+        playlist_uuid: r.playlistUuid,
+        track_id: trackIdMap.get(r.trackId)!,
+        genre_id: genreIdMap.get(r.trackGenre ?? "unknown")!,
+        artist_ids: r.artistsIds.map((a) => artistIdMap.get(a)!),
+        rating: starsToRating(r.stars),
+        ts,
+      })),
+    );
 
-        await insertUserEvent(client, {
-          user_id: userId,
-          playlist_uuid: r.playlistUuid,
-          track_id: trackInternal,
-          genre_id: genreInternal,
-          artist_ids: artistsInternal,
-          rating,
-          ts,
-        });
-      }
+    await client.query("COMMIT");
 
-      await client.query("COMMIT");
+    // Эмбеддинг считается асинхронно — не блокируем ответ.
+    computeAndSaveEmbedding(pool, userId).catch((err) =>
+      console.error("Embedding computation failed:", err),
+    );
 
-      // Асинхронно вычисляем эмбеддинг и сохраняем (не блокируем ответ)
-      computeAndSaveEmbedding(pool, userId).catch((err) =>
-        console.error("Embedding computation failed:", err),
-      );
-
-      return res.status(200).json({ message: "Рейтинги сохранены в Postgres" });
-    } catch (err) {
-      await client.query("ROLLBACK");
-      console.error(err);
-      return res
-        .status(500)
-        .json({ message: "Ошибка записи рейтингов в Postgres" });
-    } finally {
-      client.release();
-    }
-  })().catch((err) => {
+    return res.status(200).json({ message: "Рейтинги сохранены в Postgres" });
+  } catch (err) {
+    await client.query("ROLLBACK");
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Ошибка записи рейтингов в Postgres" });
-  });
+    return res.status(500).json({ message: "Ошибка записи рейтингов в Postgres" });
+  } finally {
+    client.release();
+  }
 };
 
-export const exportTrainingJsonl = (req: Request, res: Response) => {
-  const pool = getPool();
-  (async () => {
-    try {
-      const jsonl = await exportEventsForTraining(pool);
-
-      res.setHeader("Content-Type", "application/jsonl; charset=utf-8");
-      res.setHeader(
-        "Content-Disposition",
-        'attachment; filename="user_events.jsonl"',
-      );
-      return res.status(200).send(jsonl.length ? `${jsonl}\n` : "");
-    } catch (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Ошибка экспорта" });
-    }
-  })().catch((err) => {
+export const exportTrainingJsonl = async (req: Request, res: Response) => {
+  try {
+    const jsonl = await exportEventsForTraining(getPool());
+    res.setHeader("Content-Type", "application/jsonl; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="user_events.jsonl"');
+    return res.status(200).send(jsonl.length ? `${jsonl}\n` : "");
+  } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Ошибка экспорта" });
-  });
+  }
 };

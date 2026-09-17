@@ -199,6 +199,85 @@ export async function insertUserEvent(db: Queryable, ev: DbUserEvent): Promise<v
   );
 }
 
+// ── Batch-варианты для массовой вставки оценок ───────────────────────────────
+// Заменяют цикл getOrCreate*/insertUserEvent (~300 запросов на 100 треков)
+// на 4 запроса суммарно.
+
+export async function batchGetOrCreateTrackIds(
+  db: Queryable,
+  tracks: Array<{ externalId: number; title?: string | undefined; coverUrl?: string | undefined }>,
+): Promise<Map<number, number>> {
+  if (tracks.length === 0) return new Map();
+  const res = await db.query<{ id_external: string; id_internal: string }>(
+    `INSERT INTO tracks (id_external, title, cover_url)
+     SELECT unnest($1::bigint[]), unnest($2::text[]), unnest($3::text[])
+     ON CONFLICT (id_external) DO UPDATE SET
+       title      = COALESCE(EXCLUDED.title,     tracks.title),
+       cover_url  = COALESCE(EXCLUDED.cover_url, tracks.cover_url)
+     RETURNING id_external, id_internal`,
+    [
+      tracks.map((t) => t.externalId),
+      tracks.map((t) => t.title ?? null),
+      tracks.map((t) => t.coverUrl ?? null),
+    ],
+  );
+  return new Map(res.rows.map((r) => [Number(r.id_external), Number(r.id_internal)]));
+}
+
+export async function batchGetOrCreateGenreIds(
+  db: Queryable,
+  genres: string[],
+): Promise<Map<string, number>> {
+  if (genres.length === 0) return new Map();
+  const unique = [...new Set(genres)];
+  const res = await db.query<{ id_external: string; id_internal: string }>(
+    `INSERT INTO genres (id_external)
+     SELECT unnest($1::text[])
+     ON CONFLICT (id_external) DO UPDATE SET id_external = EXCLUDED.id_external
+     RETURNING id_external, id_internal`,
+    [unique],
+  );
+  return new Map(res.rows.map((r) => [r.id_external, Number(r.id_internal)]));
+}
+
+export async function batchGetOrCreateArtistIds(
+  db: Queryable,
+  externalIds: number[],
+): Promise<Map<number, number>> {
+  if (externalIds.length === 0) return new Map();
+  const unique = [...new Set(externalIds)];
+  const res = await db.query<{ id_external: string; id_internal: string }>(
+    `INSERT INTO artists (id_external)
+     SELECT unnest($1::bigint[])
+     ON CONFLICT (id_external) DO UPDATE SET id_external = EXCLUDED.id_external
+     RETURNING id_external, id_internal`,
+    [unique],
+  );
+  return new Map(res.rows.map((r) => [Number(r.id_external), Number(r.id_internal)]));
+}
+
+export async function batchInsertUserEvents(
+  db: Queryable,
+  events: DbUserEvent[],
+): Promise<void> {
+  if (events.length === 0) return;
+  const values: unknown[] = [];
+  const placeholders = events.map((ev, i) => {
+    const b = i * 8;
+    values.push(
+      ev.user_id, ev.playlist_uuid, ev.track_id, ev.genre_id,
+      ev.artist_ids, ev.rating, ev.ts, ev.include_in_training !== false,
+    );
+    return `($${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8})`;
+  });
+  await db.query(
+    `INSERT INTO user_events
+       (user_id, playlist_uuid, track_id, genre_id, artist_ids, rating, ts, include_in_training)
+     VALUES ${placeholders.join(",")}`,
+    values,
+  );
+}
+
 export async function exportEventsForTraining(pool: Pool): Promise<string> {
   const res = await pool.query<{
     user_id: string;
