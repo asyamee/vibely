@@ -115,6 +115,12 @@ export async function migrate(pool: Pool): Promise<void> {
     );
 
     CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_friendships_a ON friendships(user_id_a);
+    CREATE INDEX IF NOT EXISTS idx_friendships_b ON friendships(user_id_b);
+    CREATE INDEX IF NOT EXISTS idx_user_playlists_user ON user_playlists(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_genres_user ON user_genres(user_id);
   `);
 }
 

@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_ROUTES = ["/login", "/register"];
+const ADMIN_ROUTES = ["/admin"];
+
+// Список admin user ID читается из env (серверная переменная, не NEXT_PUBLIC_).
+const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+/** Декодирует payload JWT без верификации подписи (токен уже проверен backend-ом). */
+function decodeJwtUserId(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1])) as { userId?: string };
+    return payload.userId ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const BACKEND =
   process.env.BACKEND_INTERNAL_URL ||
@@ -31,7 +48,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (request.cookies.get("accessToken")) {
+  const existingAccessToken = request.cookies.get("accessToken")?.value;
+  if (existingAccessToken) {
+    const isAdminRoute = ADMIN_ROUTES.some((r) => pathname.startsWith(r));
+    if (isAdminRoute && ADMIN_USER_IDS.length > 0) {
+      const userId = decodeJwtUserId(existingAccessToken);
+      if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+        return NextResponse.redirect(new URL("/", request.url));
+      }
+    }
     return NextResponse.next();
   }
 
@@ -60,6 +85,15 @@ export async function middleware(request: NextRequest) {
     if (!newAccessToken) {
       // Backend не вернул токен — на всякий случай уходим на логин.
       return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    // Проверяем доступ к admin-роутам после получения свежего токена.
+    const isAdminRoute = ADMIN_ROUTES.some((r) => pathname.startsWith(r));
+    if (isAdminRoute && ADMIN_USER_IDS.length > 0) {
+      const userId = decodeJwtUserId(newAccessToken);
+      if (!userId || !ADMIN_USER_IDS.includes(userId)) {
+        return NextResponse.redirect(new URL("/", request.url));
+      }
     }
 
     // КРИТИЧНО: подменяем cookie прямо в текущем входящем запросе, чтобы Server Components
