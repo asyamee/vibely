@@ -42,6 +42,8 @@ NUM_TRACKS = int(os.getenv("AI_NUM_TRACKS", "500000"))
 NUM_ARTISTS = int(os.getenv("AI_NUM_ARTISTS", "100000"))
 NUM_GENRES = int(os.getenv("AI_NUM_GENRES", "64"))
 
+MAX_HISTORY_LENGTH = 5000
+
 # Блокировки для безопасного доступа из нескольких потоков.
 # _model_lock защищает app.state.model и глобальные NUM_*.
 # _embeddings_lock защищает app.state.user_embeddings.
@@ -322,6 +324,11 @@ def health() -> dict[str, str]:
 
 @app.post("/users/register", response_model=UserEmbeddingResponse)
 def register_user(payload: RegisterUserRequest) -> UserEmbeddingResponse:
+    if len(payload.tracks) > MAX_HISTORY_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Track history exceeds limit of {MAX_HISTORY_LENGTH}",
+        )
     _validate_ids(payload)
     history = _payload_to_history(payload)
     with _model_lock:
@@ -367,6 +374,11 @@ def nearest_users(
 
 @app.post("/compute-embedding", response_model=UserEmbeddingResponse)
 def compute_embedding(payload: ComputeEmbeddingRequest) -> UserEmbeddingResponse:
+    if len(payload.tracks) > MAX_HISTORY_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Track history exceeds limit of {MAX_HISTORY_LENGTH}",
+        )
     t0 = time.monotonic()
     history = [
         {

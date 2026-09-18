@@ -1,4 +1,6 @@
 
+import logging
+
 import numpy as np
 import torch
 
@@ -7,12 +9,23 @@ try:
 except ImportError:
     from nearest_neighbours import cosine_similarity  # noqa: F401
 
+logger = logging.getLogger("vibely-inference")
+
 
 def pad_artists(artist_lists: list[list[int]], pad_value: int = 0) -> list[list[int]]:
     if not artist_lists:
         return []
     max_len = max(len(a) for a in artist_lists)
     return [a + [pad_value] * (max_len - len(a)) for a in artist_lists]
+
+
+def _resolve_device(requested: str | None = None) -> torch.device:
+    if requested is None:
+        requested = "cuda" if torch.cuda.is_available() else "cpu"
+    if requested == "cuda" and not torch.cuda.is_available():
+        logger.warning("CUDA requested but unavailable, falling back to CPU")
+        return torch.device("cpu")
+    return torch.device(requested)
 
 
 def build_user_embedding(model, user_history: list[dict], device: str | None = None) -> np.ndarray:
@@ -28,8 +41,7 @@ def build_user_embedding(model, user_history: list[dict], device: str | None = N
     if not user_history:
         raise ValueError("user_history must not be empty")
 
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = _resolve_device(device)
 
     track_ids = torch.tensor(
         [item["track_id"] for item in user_history],
