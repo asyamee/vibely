@@ -19,7 +19,34 @@ Code style source of truth: this file. If a rule appears in multiple places and 
 
 ---
 
-## 2. TypeScript
+## 2. Разделение ответственности
+
+Структура компонента/экрана:
+
+```
+ComponentName/
+  ComponentName.tsx        — вёрстка + простая логика
+  ComponentName.module.css — стили
+  types.ts                 — интерфейсы, типы, пропсы
+  index.ts                 — barrel export
+```
+
+При необходимости:
+```
+  hooks/useSmth.ts         — сложная логика, вынесенная из компонента
+  utils/smth.ts            — чистые функции, хелперы
+```
+
+| Rule | Why |
+|------|-----|
+| **Типы — в `types.ts`, не inline в компоненте.** | Переиспользуемость, читаемость, один источник правды для типов. |
+| **Стили — в `.module.css`. Никаких `style={{}}`, никаких хардкоженных цветов.** | Inline styles не участвуют в scoping CSS Modules и не переопределяются. |
+| **Если логика разрастается (много state, effects, handlers) — выноси в хук в `hooks/` или чистые функции в `utils/`.** | Компонент должен оставаться читаемым. Хук легко переиспользовать и тестировать отдельно. |
+| **Не заставляй выносить хук ради выноса.** Если компонент читаем с логикой внутри (< 100 строк, 1-2 useState) — это ок. | Преждевременная декомпозиция усложняет навигацию и не добавляет ценности. |
+
+---
+
+## 3. TypeScript
 
 | Rule | Why |
 |------|-----|
@@ -48,7 +75,7 @@ const name = track.artists?.[0]?.name ?? 'Unknown'
 
 ---
 
-## 3. React Performance
+## 4. React Performance
 
 | Rule | Why |
 |------|-----|
@@ -57,7 +84,7 @@ const name = track.artists?.[0]?.name ?? 'Unknown'
 
 ---
 
-## 4. Naming & Code Quality
+## 5. Naming & Code Quality
 
 | Rule | Why |
 |------|-----|
@@ -69,7 +96,7 @@ const name = track.artists?.[0]?.name ?? 'Unknown'
 
 ---
 
-## 5. Components
+## 6. Components
 
 Arrow functions only — no `function` declarations:
 
@@ -83,7 +110,7 @@ const Foo = ({ bar }: IFooProps) => { ... }
 
 ---
 
-## 6. Exports
+## 7. Exports
 
 Named exports everywhere. Default export only for Next.js pages:
 
@@ -107,7 +134,7 @@ export * from './BackButton/BackButton'
 
 ---
 
-## 7. SVG Icons
+## 8. SVG Icons
 
 Extend `ComponentPropsWithoutRef<'svg'>` and spread `...props` onto `<svg>`:
 
@@ -127,7 +154,7 @@ export const FooIcon = ({ fill = 'currentColor', ...props }: IFooIconProps) => (
 
 ---
 
-## 8. Styles & Layout
+## 9. Styles & Layout
 
 | Rule | Why |
 |------|-----|
@@ -142,7 +169,7 @@ export const FooIcon = ({ fill = 'currentColor', ...props }: IFooIconProps) => (
 
 ---
 
-## 9. Import Order
+## 10. Import Order
 
 1. `react` imports
 2. Third-party (`next/`, `zustand`, `axios`, `react-hook-form`, etc.)
@@ -165,7 +192,7 @@ import styles from './LoginPage.module.css'
 
 ---
 
-## 10. Zustand
+## 11. Zustand
 
 Selectors only; parameter is always named `state`.
 
@@ -186,7 +213,7 @@ Do not call `useStore()` without a selector. Use `useShallow` when selecting 2 o
 
 ---
 
-## 11. Formatting
+## 12. Formatting
 
 - No semicolons
 - Trailing commas in multiline arrays/objects
@@ -194,7 +221,7 @@ Do not call `useStore()` without a selector. Use `useShallow` when selecting 2 o
 
 ---
 
-## 12. Prohibited
+## 13. Prohibited
 
 | Rule | Why |
 |------|-----|
@@ -205,7 +232,7 @@ Do not call `useStore()` without a selector. Use `useShallow` when selecting 2 o
 
 ---
 
-## 13. Error Handling
+## 14. Error Handling
 
 Extract error messages consistently:
 
@@ -225,7 +252,7 @@ Use this helper everywhere instead of inline type gymnastics.
 
 ---
 
-## 14. Process
+## 15. Process
 
 If you spend **more than 1 hour** stuck on a problem and feel like you've hit a wall — stop and ask a colleague. 15 minutes of pair programming often saves 3 hours of debugging and produces a simpler solution.
 
