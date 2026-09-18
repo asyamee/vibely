@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import random
+from dataclasses import dataclass
 
 import torch
 import torch.nn.functional as F
@@ -13,6 +14,19 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from dataset import build_users_from_events, load_events_from_jsonl
 from inference import pad_artists
 from model import UserMusicEncoder
+
+
+@dataclass(frozen=True)
+class TrainConfig:
+    lr: float = 1e-3
+    lr_factor: float = 0.5
+    lr_patience: int = 3
+    min_lr: float = 1e-5
+    epochs: int = 50
+    steps_per_epoch: int = 200
+    batch_size: int = 8
+    patience: int = 5
+    diversity_weight: float = 0.1
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger("vibely-train")
@@ -83,8 +97,8 @@ def split_pos_neg(history: list[dict]) -> tuple[list[dict], list[dict]]:
 
 
 def sample_bpr_loss(
-    model,
-    users: dict[str, list[dict]],
+    model: UserMusicEncoder,
+    users: dict[str, list[dict[str, object]]],
     user_ids: list[str],
     device: str,
     diversity_weight: float = 0.1,

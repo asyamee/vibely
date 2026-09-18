@@ -4,10 +4,8 @@ import logging
 import numpy as np
 import torch
 
-try:
-    from .nearest_neighbours import cosine_similarity
-except ImportError:
-    from nearest_neighbours import cosine_similarity  # noqa: F401
+from model import UserMusicEncoder
+from nearest_neighbours import cosine_similarity  # noqa: F401
 
 logger = logging.getLogger("vibely-inference")
 
@@ -28,7 +26,11 @@ def _resolve_device(requested: str | None = None) -> torch.device:
     return torch.device(requested)
 
 
-def build_user_embedding(model, user_history: list[dict], device: str | None = None) -> np.ndarray:
+def build_user_embedding(
+    model: UserMusicEncoder,
+    user_history: list[dict[str, object]],
+    device: str | None = None,
+) -> np.ndarray:
     """
     Строит нормализованный вектор пользователя из его истории прослушиваний.
 

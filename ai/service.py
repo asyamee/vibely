@@ -20,16 +20,11 @@ from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-try:
-    from .dataset import build_users_from_events, load_events_from_jsonl
-    from .inference import build_user_embedding
-    from .model import UserMusicEncoder
-    from .nearest_neighbours import find_nearest_users
-except ImportError:
-    from dataset import build_users_from_events, load_events_from_jsonl
-    from inference import build_user_embedding
-    from model import UserMusicEncoder
-    from nearest_neighbours import find_nearest_users
+from dataset import build_users_from_events, load_events_from_jsonl
+from inference import build_user_embedding, pad_artists
+from model import UserMusicEncoder
+from nearest_neighbours import find_nearest_users
+from rating_utils import liked_str_to_rating
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger("vibely-ai")
@@ -230,10 +225,7 @@ def _retrain_bg(events_jsonl: str | None, epochs: int, diversity_weight: float) 
                 data_path = None
 
         # 2. Train
-        try:
-            from train import train_model
-        except ImportError:
-            from .train import train_model  # type: ignore
+        from train import train_model
 
         _train_state.add_log(f"INFO: diversity_weight={diversity_weight}")
         best_loss = train_model(
@@ -293,25 +285,13 @@ def _validate_ids(payload: RegisterUserRequest) -> None:
                 raise HTTPException(status_code=400, detail="artist id out of range")
 
 
-def _liked_to_rating(liked: str | None) -> float:
-    if liked == "strong_like":
-        return 1.0
-    if liked == "like":
-        return 0.5
-    if liked == "dislike":
-        return -0.5
-    if liked == "strong_dislike":
-        return -1.0
-    return -0.1
-
-
 def _payload_to_history(payload: RegisterUserRequest) -> list[dict]:
     return [
         {
             "track_id": t.id,
             "genre_id": t.genre_id,
             "artist_ids": t.artist_ids,
-            "rating": _liked_to_rating(t.liked),
+            "rating": liked_str_to_rating(t.liked),
         }
         for t in payload.tracks
     ]

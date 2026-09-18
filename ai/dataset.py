@@ -4,11 +4,20 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
+from typing import TypedDict
 
 logger = logging.getLogger("vibely-ai")
 
-Event = dict[str, object]
-UserHistory = list[dict[str, object]]
+
+class Event(TypedDict):
+    user_id: str
+    track_id: int
+    genre_id: int
+    artist_ids: list[int]
+    rating: float
+
+
+UserHistory = list[Event]
 
 _REQUIRED_FIELDS = {"user_id", "track_id", "genre_id", "artist_ids", "rating"}
 

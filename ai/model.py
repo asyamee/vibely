@@ -1,6 +1,18 @@
+from dataclasses import dataclass
+
 import torch
 import torch.nn.functional as F
 from torch import nn
+
+
+@dataclass(frozen=True)
+class ModelConfig:
+    track_emb_dim: int = 16
+    artist_emb_dim: int = 8
+    genre_emb_dim: int = 6
+    hidden_dim: int = 32
+    user_emb_dim: int = 16
+    dropout: float = 0.4
 
 
 class UserMusicEncoder(nn.Module):
@@ -9,33 +21,29 @@ class UserMusicEncoder(nn.Module):
         num_tracks: int,
         num_artists: int,
         num_genres: int,
-        track_emb_dim: int = 16,
-        artist_emb_dim: int = 8,
-        genre_emb_dim: int = 6,
-        hidden_dim: int = 32,
-        user_emb_dim: int = 16,
+        config: ModelConfig = ModelConfig(),
     ):
         super().__init__()
 
-        self.track_emb = nn.Embedding(num_tracks, track_emb_dim)
-        self.artist_emb = nn.Embedding(num_artists, artist_emb_dim)
-        self.genre_emb = nn.Embedding(num_genres, genre_emb_dim)
+        self.track_emb = nn.Embedding(num_tracks, config.track_emb_dim)
+        self.artist_emb = nn.Embedding(num_artists, config.artist_emb_dim)
+        self.genre_emb = nn.Embedding(num_genres, config.genre_emb_dim)
 
         # track + aggregated artists + single genre + rating
-        input_dim = track_emb_dim + artist_emb_dim + genre_emb_dim + 1
+        input_dim = config.track_emb_dim + config.artist_emb_dim + config.genre_emb_dim + 1
 
         self.event_mlp = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+            nn.Linear(input_dim, config.hidden_dim),
             nn.ReLU(),
-            nn.Dropout(p=0.4),
-            nn.Linear(hidden_dim, user_emb_dim),
+            nn.Dropout(p=config.dropout),
+            nn.Linear(config.hidden_dim, config.user_emb_dim),
         )
 
         self.user_mlp = nn.Sequential(
-            nn.Linear(user_emb_dim, hidden_dim),
+            nn.Linear(config.user_emb_dim, config.hidden_dim),
             nn.ReLU(),
-            nn.Dropout(p=0.4),
-            nn.Linear(hidden_dim, user_emb_dim),
+            nn.Dropout(p=config.dropout),
+            nn.Linear(config.hidden_dim, config.user_emb_dim),
         )
 
     def encode_events(
