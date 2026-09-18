@@ -1,58 +1,26 @@
 import type { Request, Response } from "express";
-import { exportEventsForTraining, getPool } from "../db/postgres.js";
+import { logger } from "../lib/logger.js";
+import { sendSuccess } from "../lib/response.js";
+import {
+  getAdminStats as getAdminStatsService,
+  startRetrain as startRetrainService,
+  reloadModel as reloadModelService,
+  getRetrainStreamUrl,
+} from "../services/admin/index.js";
 
-const AI_URL = process.env.AI_SERVICE_URL ?? "http://localhost:8000";
-const AI_ADMIN_TOKEN = process.env.AI_ADMIN_TOKEN ?? "";
-
-const adminHeaders = { "x-admin-token": AI_ADMIN_TOKEN };
-
-export const getAdminStats = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const upstream = await fetch(`${AI_URL}/admin/stats`, { headers: adminHeaders });
-    res.status(upstream.status).json(await upstream.json());
-  } catch {
-    res.status(502).json({ message: "AI service unavailable" });
-  }
+export const getAdminStats = async (req: Request, res: Response) => {
+  const data = await getAdminStatsService();
+  sendSuccess(res, data);
 };
 
-export const startRetrain = async (req: Request, res: Response): Promise<void> => {
-  const { with_export = false, epochs = 50, diversity_weight = 0.1 } = req.body as {
-    with_export?: boolean;
-    epochs?: number;
-    diversity_weight?: number;
-  };
-
-  try {
-    let events_jsonl: string | null = null;
-
-    if (with_export) {
-      const pool = getPool();
-      events_jsonl = await exportEventsForTraining(pool);
-    }
-
-    const upstream = await fetch(`${AI_URL}/admin/retrain`, {
-      method: "POST",
-      headers: { ...adminHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({ events_jsonl, epochs, diversity_weight }),
-    });
-
-    res.status(upstream.status).json(await upstream.json());
-  } catch (err) {
-    console.error("Admin retrain error:", err);
-    res.status(502).json({ message: "AI service unavailable" });
-  }
+export const startRetrain = async (req: Request, res: Response) => {
+  const data = await startRetrainService(req.body);
+  sendSuccess(res, data);
 };
 
-export const reloadModel = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const upstream = await fetch(`${AI_URL}/admin/reload`, {
-      method: "POST",
-      headers: adminHeaders,
-    });
-    res.status(upstream.status).json(await upstream.json());
-  } catch {
-    res.status(502).json({ message: "AI service unavailable" });
-  }
+export const reloadModel = async (req: Request, res: Response) => {
+  const data = await reloadModelService();
+  sendSuccess(res, data);
 };
 
 export const streamRetrainLogs = async (req: Request, res: Response): Promise<void> => {
@@ -61,9 +29,12 @@ export const streamRetrainLogs = async (req: Request, res: Response): Promise<vo
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
 
+  const streamUrl = getRetrainStreamUrl();
+  const AI_ADMIN_TOKEN = process.env.AI_ADMIN_TOKEN ?? "";
+
   try {
-    const upstream = await fetch(`${AI_URL}/admin/retrain/stream`, {
-      headers: adminHeaders,
+    const upstream = await fetch(streamUrl, {
+      headers: { "x-admin-token": AI_ADMIN_TOKEN },
     });
 
     if (!upstream.body) {
@@ -80,7 +51,8 @@ export const streamRetrainLogs = async (req: Request, res: Response): Promise<vo
       res.write(value);
     }
     res.end();
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "streamRetrainLogs: AI service error");
     res.write(`data: ${JSON.stringify({ error: "AI service unavailable" })}\n\n`);
     res.end();
   }

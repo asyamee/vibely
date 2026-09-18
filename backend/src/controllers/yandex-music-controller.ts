@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { YMApi } from "ym-api";
 import dotenv from "dotenv";
 import { getPlaylistByUUID } from "../api/get-playlists-by-uuid.js";
+import { logger } from "../lib/logger.js";
 import type { PlaylistTrackItem } from "../types/playlist-track.types.js";
 import type { RawPlaylistResponse } from "../types/playlist.types.js";
 
@@ -61,7 +62,7 @@ export const playlist_UUID = async (
       cover: response.ogImage?.replace("%%", "300x300"),
     });
   } catch (e) {
-    console.error(e);
+    logger.error({ err: e }, "playlist_UUID: failed to fetch from Yandex Music");
     res.status(400).json({ message: "Failed to fetch playlist from Yandex Music" });
   }
 };
