@@ -21,9 +21,11 @@ class UserMusicEncoder(nn.Module):
         num_tracks: int,
         num_artists: int,
         num_genres: int,
-        config: ModelConfig = ModelConfig(),
+        config: ModelConfig | None = None,
     ):
         super().__init__()
+        if config is None:
+            config = ModelConfig()
 
         self.track_emb = nn.Embedding(num_tracks, config.track_emb_dim)
         self.artist_emb = nn.Embedding(num_artists, config.artist_emb_dim)

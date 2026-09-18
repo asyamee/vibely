@@ -21,7 +21,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from dataset import build_users_from_events, load_events_from_jsonl
-from inference import build_user_embedding, pad_artists
+from inference import build_user_embedding
 from model import UserMusicEncoder
 from nearest_neighbours import find_nearest_users
 from rating_utils import liked_str_to_rating
