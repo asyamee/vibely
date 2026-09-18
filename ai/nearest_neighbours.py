@@ -1,9 +1,13 @@
 
+import heapq
+
 import numpy as np
+
+EPSILON = 1e-8
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    return float(np.dot(a, b) / ((np.linalg.norm(a) * np.linalg.norm(b)) + 1e-8))
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + EPSILON))
 
 
 def find_nearest_users(
@@ -11,11 +15,8 @@ def find_nearest_users(
     all_embeddings: dict[str, np.ndarray],
     top_k: int = 10,
 ) -> list[tuple[str, float]]:
-    result = []
-
-    for user_id, emb in all_embeddings.items():
-        sim = cosine_similarity(target_embedding, emb)
-        result.append((user_id, sim))
-
-    result.sort(key=lambda x: x[1], reverse=True)
-    return result[:top_k]
+    results = [
+        (user_id, cosine_similarity(target_embedding, emb))
+        for user_id, emb in all_embeddings.items()
+    ]
+    return heapq.nlargest(top_k, results, key=lambda x: x[1])

@@ -1,48 +1,29 @@
 import type { Request, Response, NextFunction } from "express";
+import { AppError } from "../lib/app-error.js";
+import { logger } from "../lib/logger.js";
 
-// Интерфейс для пользовательской ошибки
-interface CustomError extends Error {
-  statusCode?: number;
-}
-
-/**
- * Middleware для обработки ошибок
- */
 export const errorHandler = (
-  err: CustomError,
+  err: Error,
   req: Request,
   res: Response,
-  next: NextFunction,
-) => {
-  console.error(`[ERROR] ${new Date().toISOString()} - ${err.message}`);
-  console.error(err.stack);
+  _next: NextFunction,
+): void => {
+  const statusCode = err instanceof AppError ? err.statusCode : 500;
 
-  // Определение статус-кода ошибки
-  const statusCode = err.statusCode || 500;
+  if (statusCode >= 500) {
+    logger.error({ err, method: req.method, url: req.url }, "unhandled error");
+  } else {
+    logger.warn({ message: err.message, method: req.method, url: req.url }, "expected error");
+  }
 
-  // В production скрываем детали неожиданных (5xx) ошибок — они могут содержать
-  // имена таблиц, фрагменты SQL и прочую внутреннюю информацию.
-  const isExpectedError = err.statusCode !== undefined && err.statusCode < 500;
   const message =
-    isExpectedError || process.env.NODE_ENV === "development"
-      ? err.message || "Internal Server Error"
+    statusCode < 500 || process.env.NODE_ENV === "development"
+      ? err.message
       : "Internal Server Error";
 
-  const response = {
-    success: false,
-    message,
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
-  };
-
-  res.status(statusCode).json(response);
+  res.status(statusCode).json({ success: false, error: message });
 };
 
-/**
- * Middleware для обработки 404 ошибок
- */
-export const notFoundHandler = (req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    message: `Route ${req.originalUrl} not found`,
-  });
+export const notFoundHandler = (req: Request, res: Response): void => {
+  res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
 };

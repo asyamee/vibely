@@ -10,6 +10,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 
 import requests
 import torch
@@ -26,13 +27,32 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 DEFAULT_JSONL = os.path.join(DATA_DIR, "user_events.jsonl")
 
 
+def fetch_with_retry(
+    url: str,
+    headers: dict[str, str] | None = None,
+    max_retries: int = 3,
+    timeout: int = 30,
+) -> requests.Response:
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(url, headers=headers or {}, timeout=timeout)
+            resp.raise_for_status()
+            return resp
+        except requests.RequestException as exc:
+            if attempt == max_retries - 1:
+                raise
+            delay = 5 * (2 ** attempt)
+            logger.warning("Retry %d/%d after %ds: %s", attempt + 1, max_retries, delay, exc)
+            time.sleep(delay)
+    raise RuntimeError("unreachable")
+
+
 def download_events(backend_url: str, out_path: str, token: str | None = None) -> int:
     url = backend_url.rstrip("/") + "/api/ratings/export-jsonl"
     logger.info("Downloading events from %s", url)
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     try:
-        resp = requests.get(url, headers=headers, timeout=30)
-        resp.raise_for_status()
+        resp = fetch_with_retry(url, headers=headers)
     except requests.RequestException as e:
         logger.error("Failed to download events: %s", e)
         sys.exit(1)
@@ -146,7 +166,9 @@ def main() -> None:
 
     # Пересчитать embeddings для всех пользователей
     logger.info("Updating user embeddings...")
-    device = "cuda" if args.use_gpu else "cpu"
+    if args.use_gpu and not torch.cuda.is_available():
+        logger.warning("--use-gpu specified but CUDA unavailable, falling back to CPU")
+    device = "cuda" if args.use_gpu and torch.cuda.is_available() else "cpu"
     updated = update_user_embeddings(
         backend_url=args.backend_url,
         model_path=args.model_path,

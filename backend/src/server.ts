@@ -9,6 +9,8 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import { pinoHttp } from "pino-http";
+import { logger } from "./lib/logger.js";
 
 // Импорт конфигурации
 import AppConfig from "./config/app.config.js";
@@ -30,7 +32,7 @@ const PORT = parseInt(process.env.PORT || "3000");
 // Инициализация БД (Postgres) + миграции
 const pool = getPool();
 migrate(pool).catch((e) => {
-  console.error("Postgres migration failed", e);
+  logger.fatal({ err: e }, "postgres migration failed");
   process.exit(1);
 });
 
@@ -80,10 +82,12 @@ const refreshLimiter = rateLimit({
 app.use("/api/auth/refresh", refreshLimiter);
 
 // Логирование запросов
-app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
-});
+app.use(pinoHttp({
+  logger,
+  customProps: (req: Request) => ({
+    userId: (req as any).user?.userId,
+  }),
+}));
 
 // Основные маршруты
 app.use("/api", apiRoutes);
@@ -106,9 +110,7 @@ app.use(errorHandler);
 
 // Запуск сервера
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Environment: ${AppConfig.env}`);
-  console.log(`Health check available at http://localhost:${PORT}/health`);
+  logger.info({ port: PORT, env: AppConfig.env }, "server started");
 });
 
 export default app;
