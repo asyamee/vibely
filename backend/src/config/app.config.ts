@@ -1,6 +1,9 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+if (!process.env.JWT_ACCESS_SECRET) throw new Error("JWT_ACCESS_SECRET is required");
+if (!process.env.JWT_REFRESH_SECRET) throw new Error("JWT_REFRESH_SECRET is required");
+
 // Конфигурация приложения
 export const AppConfig = {
   port: parseInt(process.env.PORT || "3000"),

@@ -720,6 +720,8 @@ export async function acceptFriendRequest(pool: Pool, userId: string, friendId: 
 export async function getUserFriends(
   pool: Pool,
   userId: string,
+  limit = 20,
+  offset = 0,
 ): Promise<{
   user_id: string;
   display_name: string | null;
@@ -745,8 +747,9 @@ export async function getUserFriends(
     )
     WHERE f.status = 'accepted'
     ORDER BY f.created_at DESC
+    LIMIT $2 OFFSET $3
   `,
-    [userId],
+    [userId, limit, offset],
   );
   return res.rows;
 }
