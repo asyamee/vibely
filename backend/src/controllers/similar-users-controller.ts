@@ -6,7 +6,7 @@ import { findSimilarUsers } from "../services/similar-users/index.js";
 
 export const getSimilarUsers = async (req: Request, res: Response) => {
   const userId = pickParam(req.params.userId);
-  if (!userId) throw new AppError("userId is required", 400);
+  if (!userId) throw new AppError("userId обязателен", 400);
   const topK = Math.min(
     100,
     Math.max(1, Number.parseInt((req.query.top_k as string) ?? "10", 10)),

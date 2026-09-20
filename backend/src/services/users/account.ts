@@ -17,7 +17,7 @@ export async function changePassword(
   const pool = getPool();
 
   const currentHash = await getUserPasswordHash(pool, userId);
-  if (!currentHash) throw new AppError("User not found", 404);
+  if (!currentHash) throw new AppError("Пользователь не найден", 404);
 
   const ok = await compare(currentPassword, currentHash);
   if (!ok) throw new AppError("Неверный текущий пароль", 401);
@@ -32,7 +32,7 @@ export async function deleteAccount(userId: string, currentPassword: string): Pr
   const pool = getPool();
 
   const currentHash = await getUserPasswordHash(pool, userId);
-  if (!currentHash) throw new AppError("User not found", 404);
+  if (!currentHash) throw new AppError("Пользователь не найден", 404);
 
   const ok = await compare(currentPassword, currentHash);
   if (!ok) throw new AppError("Неверный пароль", 401);

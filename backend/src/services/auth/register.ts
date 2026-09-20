@@ -31,7 +31,7 @@ export async function registerUser(input: TRegisterInput): Promise<IAuthResult> 
 
   const existing = await getUserByEmail(pool, email);
   if (existing) {
-    throw new AppError("Email already in use", 409);
+    throw new AppError("Этот email уже зарегистрирован", 409);
   }
 
   const userId = randomUUID();

@@ -13,30 +13,30 @@ import {
 
 export const getFriends = async (req: Request, res: Response) => {
   const userId = pickParam(req.params.userId);
-  if (!userId) throw new AppError("userId is required", 400);
+  if (!userId) throw new AppError("userId обязателен", 400);
   const result = await getFriendsService(userId);
   sendSuccess(res, result);
 };
 
 export const sendFriendRequest = async (req: Request, res: Response) => {
   const userId = pickParam(req.params.userId);
-  if (!userId) throw new AppError("userId is required", 400);
+  if (!userId) throw new AppError("userId обязателен", 400);
   await sendFriendRequestService(userId, req.body.targetUserId);
-  sendSuccess(res, { success: true, message: "Friend request sent" });
+  sendSuccess(res, { success: true, message: "Заявка в друзья отправлена" });
 };
 
 export const acceptFriend = async (req: Request, res: Response) => {
   const userId = pickParam(req.params.userId);
   const friendId = pickParam(req.params.friendId);
-  if (!userId || !friendId) throw new AppError("userId and friendId are required", 400);
+  if (!userId || !friendId) throw new AppError("userId и friendId обязательны", 400);
   await acceptFriendService(userId, friendId);
-  sendSuccess(res, { success: true, message: "Friend request accepted" });
+  sendSuccess(res, { success: true, message: "Заявка принята" });
 };
 
 export const rejectFriend = async (req: Request, res: Response) => {
   const userId = pickParam(req.params.userId);
   const friendId = pickParam(req.params.friendId);
-  if (!userId || !friendId) throw new AppError("userId and friendId are required", 400);
+  if (!userId || !friendId) throw new AppError("userId и friendId обязательны", 400);
   await rejectFriendService(userId, friendId);
   sendSuccess(res, { success: true });
 };
@@ -51,7 +51,7 @@ export const removeFriend = async (req: Request, res: Response) => {
 
 export const listPendingRequests = async (req: Request, res: Response) => {
   const userId = pickParam(req.params.userId);
-  if (!userId) throw new AppError("userId is required", 400);
+  if (!userId) throw new AppError("userId обязателен", 400);
   const requests = await listPendingRequestsService(userId);
   sendSuccess(res, { userId, requests });
 };

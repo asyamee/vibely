@@ -23,13 +23,13 @@ export async function loginUser(input: TLoginInput): Promise<IAuthResult> {
   const user = await getUserByEmail(pool, email);
   if (!user || !user.password_hash) {
     logger.warn({ email }, "login failed: user not found");
-    throw new AppError("Invalid credentials", 401);
+    throw new AppError("Неверный email или пароль", 401);
   }
 
   const passwordValid = await compare(password, user.password_hash);
   if (!passwordValid) {
     logger.warn({ email }, "login failed: wrong password");
-    throw new AppError("Invalid credentials", 401);
+    throw new AppError("Неверный email или пароль", 401);
   }
 
   const accessToken = jwt.sign(
