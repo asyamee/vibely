@@ -5,8 +5,14 @@ import type { PlaylistOwner } from "../types/playlist-owner.types.js";
 
 dotenv.config();
 
-const access_token = process.env.ACCESS_TOKEN || "";
-const instance = initAxiosInstance(access_token);
+let instance: ReturnType<typeof initAxiosInstance> | null = null;
+
+function getInstance() {
+  if (!instance) {
+    instance = initAxiosInstance(process.env.ACCESS_TOKEN || "");
+  }
+  return instance;
+}
 
 export const getPlaylistByUUID = async (
   uuid: string,
@@ -19,7 +25,7 @@ export const getPlaylistByUUID = async (
   ogImage: string;
 }> => {
   try {
-    const response = await instance.get(`/playlist/${uuid}`);
+    const response = await getInstance().get(`/playlist/${uuid}`);
 
     return response.data.result;
   } catch (e) {

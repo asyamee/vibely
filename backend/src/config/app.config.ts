@@ -6,13 +6,13 @@ if (!process.env.JWT_REFRESH_SECRET) throw new Error("JWT_REFRESH_SECRET is requ
 
 // Конфигурация приложения
 export const AppConfig = {
-  port: parseInt(process.env.PORT || "3000"),
+  port: parseInt(process.env.PORT || "3011"),
   host: process.env.HOST || "localhost",
   env: process.env.NODE_ENV || "development",
 
   // Конфигурация CORS
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    origin: process.env.CORS_ORIGIN || "http://localhost:3010",
     credentials: true,
   },
 
