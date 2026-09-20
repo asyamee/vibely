@@ -2,12 +2,12 @@ import React from "react";
 import { X } from "lucide-react";
 import styles from "./GenreTag.module.css";
 
-interface GenreTagProps {
+interface IGenreTagProps {
   label: string;
   onRemove?: () => void;
 }
 
-export const GenreTag: React.FC<GenreTagProps> = ({ label, onRemove }) => {
+export const GenreTag: React.FC<IGenreTagProps> = ({ label, onRemove }) => {
   return (
     <div className={`${styles.tag} ${onRemove ? styles.tagWithButton : ""}`}>
       {label}

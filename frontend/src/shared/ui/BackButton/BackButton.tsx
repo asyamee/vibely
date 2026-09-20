@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import styles from "./BackButton.module.css";
 
-interface Props {
+interface IBackButtonProps {
   fallbackHref?: string;
   label?: string;
 }
 
-export const BackButton: React.FC<Props> = ({ fallbackHref = "/", label = "Назад" }) => {
+export const BackButton: React.FC<IBackButtonProps> = ({ fallbackHref = "/", label = "Назад" }) => {
   const router = useRouter();
 
   const handleClick = () => {
