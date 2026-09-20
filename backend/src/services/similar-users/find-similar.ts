@@ -42,7 +42,7 @@ export async function findSimilarUsers(
 
   const target = await getUserEmbedding(pool, userId);
   if (!target) {
-    throw new AppError("user embedding not found", 404);
+    throw new AppError("Эмбеддинг пользователя не найден — сначала оцените треки", 404);
   }
 
   const all = await getAllUserEmbeddingsExcept(pool, userId);

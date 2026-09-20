@@ -2,9 +2,9 @@ import type { NextConfig } from "next";
 
 const backendOrigin = (() => {
   try {
-    return new URL(process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001").origin;
+    return new URL(process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3011").origin;
   } catch {
-    return "http://localhost:3001";
+    return "http://localhost:3011";
   }
 })();
 
@@ -17,7 +17,9 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      process.env.NODE_ENV === "development"
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        : "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://avatars.yandex.net",
       `connect-src 'self' ${backendOrigin}`,

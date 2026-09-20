@@ -10,14 +10,14 @@ import {
 
 export const listMyPlaylists = async (req: Request, res: Response) => {
   const userId = pickParam(req.params.userId);
-  if (!userId) throw new AppError("userId is required", 400);
+  if (!userId) throw new AppError("userId обязателен", 400);
   const playlists = await listPlaylists(userId);
   sendSuccess(res, { userId, playlists });
 };
 
 export const addPlaylist = async (req: Request, res: Response) => {
   const userId = pickParam(req.params.userId);
-  if (!userId) throw new AppError("userId is required", 400);
+  if (!userId) throw new AppError("userId обязателен", 400);
   const result = await addPlaylistService(userId, req.body);
   sendSuccess(res, { success: true, playlistUuid: result.playlistUuid });
 };

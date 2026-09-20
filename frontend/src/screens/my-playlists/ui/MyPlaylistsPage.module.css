@@ -1,7 +1,7 @@
 .container {
-  max-width: 720px;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 32px 20px;
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -17,12 +17,12 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .sectionTitle {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
   color: var(--color-text);
 }
@@ -36,9 +36,13 @@
 
 .empty,
 .muted {
-  color: var(--color-text-muted, #999);
+  color: var(--color-text-muted);
   margin: 0;
   font-size: 14px;
+  text-align: center;
+  padding: 32px 16px;
+  background: var(--color-surface);
+  border-radius: var(--radius-element);
 }
 
 .list {
@@ -56,7 +60,7 @@
   justify-content: space-between;
   padding: 12px 16px;
   background: var(--color-surface);
-  border-radius: var(--radius-element, 12px);
+  border-radius: var(--radius-element);
   gap: 12px;
   color: var(--color-text);
 }
@@ -66,7 +70,7 @@
   margin-left: 8px;
   padding: 2px 8px;
   font-size: 11px;
-  background: var(--color-accent, #4a90e2);
+  background: var(--color-accent);
   color: #fff;
   border-radius: 999px;
 }
@@ -83,13 +87,13 @@
   gap: 12px;
   padding: 16px;
   background: var(--color-surface);
-  border-radius: var(--radius-element, 12px);
+  border-radius: var(--radius-element);
 }
 
 .trackList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   max-height: 480px;
   overflow-y: auto;
 }
@@ -99,8 +103,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 16px;
+  background: var(--color-surface);
+  border-radius: var(--radius-element);
 }
 
 .trackInfo {
@@ -114,38 +119,42 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 14px;
 }
 
 .stars {
   display: flex;
-  gap: 2px;
+  gap: 4px;
 }
 
 .star {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 22px;
-  color: rgba(255, 255, 255, 0.25);
+  font-size: 20px;
+  color: var(--color-text-muted);
   padding: 0 2px;
+  transition: color 0.2s;
 }
 
 .starActive {
-  color: #f5c518;
+  color: var(--color-accent);
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 12px;
 }
 
 .error {
   color: #ff6b6b;
   margin: 0;
+  font-size: 14px;
 }
 
 .info {
-  color: var(--color-accent, #4a90e2);
+  color: var(--color-accent);
   margin: 0;
+  font-size: 14px;
 }

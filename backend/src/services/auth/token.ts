@@ -30,7 +30,7 @@ export async function refreshToken(rawToken: string): Promise<IRefreshResult> {
 
   const tokenRecord = await getRefreshToken(pool, tokenHash);
   if (!tokenRecord) {
-    throw new AppError("Invalid or expired refresh token", 401);
+    throw new AppError("Сессия истекла, войдите заново", 401);
   }
 
   await deleteRefreshToken(pool, tokenHash);
@@ -73,7 +73,7 @@ export async function getMe(userId: string): Promise<IMeResult> {
   );
 
   if (!res.rows.length) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Пользователь не найден", 404);
   }
 
   const row = res.rows[0]!;

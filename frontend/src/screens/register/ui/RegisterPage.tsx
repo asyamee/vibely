@@ -2,13 +2,16 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
 import { useUserStore } from "@/shared/store/userStore";
-import { register } from "@/shared/api/auth.api";
+import { register } from "@/shared/api/auth";
+import { AuthLayout } from "@/shared/ui/AuthLayout/AuthLayout";
+import { FormField } from "@/shared/ui/FormField/FormField";
 import { Button } from "@/shared/ui/Button/Button";
-import { Input } from "@/shared/ui/Input/Input";
+
 import styles from "./RegisterPage.module.css";
 
 const registerSchema = z
@@ -27,7 +30,7 @@ const registerSchema = z
     path: ["confirmPassword"],
   });
 
-type RegisterFormData = z.infer<typeof registerSchema>;
+type TRegisterFormData = z.infer<typeof registerSchema>;
 
 export const RegisterPage: React.FC = () => {
   const router = useRouter();
@@ -39,12 +42,12 @@ export const RegisterPage: React.FC = () => {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm<RegisterFormData>({
+  } = useForm<TRegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: { email: "", password: "", confirmPassword: "", displayName: "" },
   });
 
-  const onSubmit = async (data: RegisterFormData) => {
+  const onSubmit = async (data: TRegisterFormData) => {
     setLoading(true);
     setError(null);
 
@@ -64,109 +67,56 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.card}>
-        <h1 className={styles.title}>Регистрация Vibely</h1>
-        <p className={styles.subtitle}>Присоединяйся и откройся музыке</p>
+    <AuthLayout
+      title="Регистрация Vibely"
+      subtitle="Присоединяйся и откройся музыке"
+      footer={<>Уже есть аккаунт? <a href="/login">Войди</a></>}
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
+        <FormField<TRegisterFormData>
+          name="email"
+          control={control}
+          type="email"
+          placeholder="Email"
+          autoComplete="email"
+          error={errors.email?.message}
+        />
 
-        <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
-          <div className={styles.formGroup}>
-            <label htmlFor="email" className={styles.label}>
-              Email
-            </label>
-            <Controller
-              name="email"
-              control={control}
-              render={({ field }) => (
-                <>
-                  <Input id="email" type="email" placeholder="your@email.com" {...field} />
-                  {errors.email && <p className={styles.error}>{errors.email.message}</p>}
-                </>
-              )}
-            />
-          </div>
+        <FormField<TRegisterFormData>
+          name="password"
+          control={control}
+          type="password"
+          placeholder="Пароль"
+          autoComplete="new-password"
+          error={errors.password?.message}
+        />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="password" className={styles.label}>
-              Пароль
-            </label>
-            <Controller
-              name="password"
-              control={control}
-              render={({ field }) => (
-                <>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    {...field}
-                  />
-                  {errors.password && <p className={styles.error}>{errors.password.message}</p>}
-                </>
-              )}
-            />
-          </div>
+        <FormField<TRegisterFormData>
+          name="confirmPassword"
+          control={control}
+          type="password"
+          placeholder="Подтвердить пароль"
+          autoComplete="new-password"
+          error={errors.confirmPassword?.message}
+        />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="confirmPassword" className={styles.label}>
-              Подтвердить пароль
-            </label>
-            <Controller
-              name="confirmPassword"
-              control={control}
-              render={({ field }) => (
-                <>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    {...field}
-                  />
-                  {errors.confirmPassword && (
-                    <p className={styles.error}>{errors.confirmPassword.message}</p>
-                  )}
-                </>
-              )}
-            />
-          </div>
+        <FormField<TRegisterFormData>
+          name="displayName"
+          control={control}
+          placeholder="Имя (опционально)"
+        />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="displayName" className={styles.label}>
-              Имя (опционально)
-            </label>
-            <Controller
-              name="displayName"
-              control={control}
-              render={({ field }) => (
-                <Input
-                  id="displayName"
-                  type="text"
-                  placeholder="Твоё имя"
-                  {...field}
-                />
-              )}
-            />
-          </div>
+        {error && <p className={styles.apiError}>{error}</p>}
 
-          {error && <p className={styles.apiError}>{error}</p>}
-
-          <Button
-            variant="primary"
-            type="submit"
-            disabled={loading}
-            className={styles.submitButton}
-          >
-            {loading ? "Регистрируемся..." : "Зарегистрироваться"}
-          </Button>
-        </form>
-
-        <p className={styles.footer}>
-          Уже есть аккаунт?{" "}
-          <a href="/login" className={styles.link}>
-            Войди
-          </a>
-        </p>
-      </div>
-    </div>
+        <Button
+          variant="primary"
+          type="submit"
+          disabled={loading}
+          className={styles.submitButton}
+        >
+          {loading ? "Регистрируемся..." : "Зарегистрироваться"}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 };

@@ -1,0 +1,31 @@
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 60px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 26px;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.message {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.link {
+  text-decoration: none;
+}

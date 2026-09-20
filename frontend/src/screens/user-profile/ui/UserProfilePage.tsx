@@ -2,33 +2,36 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+
 import {
   acceptFriendRequest,
   rejectFriendRequest,
   removeFriend,
   sendFriendRequest,
-  type FriendshipStatus,
-  type UserProfile,
-} from "@/shared/api/users.api";
+  type TFriendshipStatus,
+  type IUserProfile,
+} from "@/shared/api/users";
+import { onAvatarError } from "@/shared/lib/avatarFallback";
 import { Button } from "@/shared/ui/Button/Button";
 import { GenreTag } from "@/shared/ui/GenreTag/GenreTag";
 import { BackButton } from "@/shared/ui/BackButton/BackButton";
+
 import styles from "./UserProfilePage.module.css";
 
-interface Props {
+interface IUserProfilePageProps {
   me: string;
-  profile: UserProfile;
+  profile: IUserProfile;
 }
 
-export const UserProfilePage: React.FC<Props> = ({ me, profile }) => {
+export const UserProfilePage: React.FC<IUserProfilePageProps> = ({ me, profile }) => {
   const router = useRouter();
-  const [status, setStatus] = useState<FriendshipStatus>(profile.friendshipStatus);
+  const [status, setStatus] = useState<TFriendshipStatus>(profile.friendshipStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handle = async (
     fn: () => Promise<void>,
-    nextStatus: FriendshipStatus,
+    nextStatus: TFriendshipStatus,
     refreshOnSuccess = false,
   ) => {
     setBusy(true);
@@ -108,7 +111,7 @@ export const UserProfilePage: React.FC<Props> = ({ me, profile }) => {
     }
   };
 
-  const statusLabel: Record<FriendshipStatus, string | null> = {
+  const statusLabel: Record<TFriendshipStatus, string | null> = {
     self: null,
     none: null,
     pending_outgoing: "Заявка отправлена, ждём ответа",
@@ -120,7 +123,7 @@ export const UserProfilePage: React.FC<Props> = ({ me, profile }) => {
     <div className={styles.container}>
       <BackButton fallbackHref="/" />
       <div className={styles.header}>
-        <img src={profile.avatarUrl} alt="" className={styles.avatar} />
+        <img src={profile.avatarUrl} alt={profile.displayName || "Аватар"} onError={onAvatarError} className={styles.avatar} />
         <div className={styles.info}>
           <h1 className={styles.name}>{profile.displayName || profile.userId}</h1>
           {profile.genres.length > 0 && (

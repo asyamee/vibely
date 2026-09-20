@@ -1,12 +1,12 @@
 import { ProfilePage } from "@/screens/profile/ui/ProfilePage";
-import { safeServerFetch, serverFetch } from "@/shared/api/server";
-import type { UserProfile, FriendsResponse } from "@/shared/api/users.api";
-import type { MeResponse } from "@/shared/api/auth.api";
+import { serverFetch } from "@/shared/api/server";
+import type { IUserProfile, IFriendsResponse } from "@/shared/api/users";
+import type { IMeResponse } from "@/shared/api/auth";
 
 export default async function Profile() {
-  const me = await serverFetch<MeResponse>("/auth/me");
+  const me = await serverFetch<IMeResponse>("/auth/me");
 
-  const fallbackProfile: UserProfile = {
+  const fallbackProfile: IUserProfile = {
     userId: me.userId,
     displayName: null,
     avatarUrl: `https://avatars.yandex.net/get-yapic/${me.userId}/islands-retina-50`,
@@ -17,11 +17,11 @@ export default async function Profile() {
   };
 
   const [profile, friendsResponse] = await Promise.all([
-    safeServerFetch<UserProfile>(`/users/${me.userId}/profile`, fallbackProfile),
-    safeServerFetch<FriendsResponse>(`/users/${me.userId}/friends`, {
+    serverFetch<IUserProfile>(`/users/${me.userId}/profile`, { fallback: fallbackProfile }),
+    serverFetch<IFriendsResponse>(`/users/${me.userId}/friends`, { fallback: {
       userId: me.userId,
       friends: [],
-    }),
+    } }),
   ]);
 
   return (

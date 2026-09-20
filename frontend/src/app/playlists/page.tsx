@@ -1,13 +1,13 @@
 import { MyPlaylistsPage } from "@/screens/my-playlists/ui/MyPlaylistsPage";
-import { safeServerFetch, serverFetch } from "@/shared/api/server";
-import type { UserPlaylistsResponse } from "@/shared/api/users.api";
-import type { MeResponse } from "@/shared/api/auth.api";
+import { serverFetch } from "@/shared/api/server";
+import type { IUserPlaylistsResponse } from "@/shared/api/users";
+import type { IMeResponse } from "@/shared/api/auth";
 
 export default async function MyPlaylists() {
-  const me = await serverFetch<MeResponse>("/auth/me");
-  const list = await safeServerFetch<UserPlaylistsResponse>(
+  const me = await serverFetch<IMeResponse>("/auth/me");
+  const list = await serverFetch<IUserPlaylistsResponse>(
     `/users/${me.userId}/playlists`,
-    { userId: me.userId, playlists: [] },
+    { fallback: { userId: me.userId, playlists: [] } },
   );
   return <MyPlaylistsPage userId={me.userId} initialPlaylists={list.playlists} />;
 }

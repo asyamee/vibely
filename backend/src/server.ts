@@ -27,7 +27,7 @@ import {
 
 const app = express();
 // Переопределяем PORT после загрузки dotenv
-const PORT = parseInt(process.env.PORT || "3000");
+const PORT = parseInt(process.env.PORT || "3011");
 
 // Инициализация БД (Postgres) + миграции
 const pool = getPool();

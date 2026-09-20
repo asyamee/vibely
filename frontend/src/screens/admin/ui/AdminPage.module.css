@@ -1,23 +1,23 @@
 .container {
   max-width: 900px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 32px 20px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
 }
 
 .title {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-text);
   margin: 0;
 }
 
 .card {
   background-color: var(--color-surface);
-  border-radius: var(--radius-card);
-  padding: 32px;
+  border-radius: var(--radius-element);
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -25,7 +25,7 @@
 
 .sectionTitle {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text);
   margin: 0;
 }
@@ -33,13 +33,13 @@
 /* Stats grid */
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 12px;
 }
 
 .statItem {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 149, 109, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-element);
   padding: 16px;
   display: flex;
@@ -51,7 +51,7 @@
   font-size: 12px;
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
 }
 
 .statValue {
@@ -98,7 +98,7 @@
 .input {
   padding: 10px 14px;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 149, 109, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-element);
   color: var(--color-text);
   font-size: 14px;
@@ -131,8 +131,8 @@
 /* Terminal */
 .terminal {
   background: #0c0c0c;
-  border: 1px solid rgba(255, 149, 109, 0.2);
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-element);
   padding: 16px;
   height: 420px;
   overflow-y: auto;
@@ -191,11 +191,55 @@
   margin: 0;
 }
 
-@media (max-width: 600px) {
-  .container { padding: 20px; }
-  .card { padding: 20px; }
-  .title { font-size: 24px; }
-  .formRow { flex-direction: column; }
-  .formGroupSmall { width: 100%; }
-  .terminal { height: 280px; }
+.lastLog {
+  margin: 0;
+  font-size: 12px;
+}
+
+.rangeInput {
+  accent-color: var(--color-accent);
+  width: 100%;
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.reloadSuccess {
+  color: #78ff78;
+  font-size: 14px;
+}
+
+.reloadError {
+  color: #ff6b6b;
+  font-size: 14px;
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 20px 16px;
+    gap: 24px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .card {
+    padding: 20px;
+  }
+
+  .formRow {
+    flex-direction: column;
+  }
+
+  .formGroupSmall {
+    width: 100%;
+  }
+
+  .terminal {
+    height: 280px;
+  }
 }

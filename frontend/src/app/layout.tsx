@@ -3,11 +3,11 @@ import { Providers } from "./providers";
 import { AppShell } from "@/shared/ui/AppShell/AppShell";
 import "./globals.css";
 
-type RootLayoutProps = {
+type TRootLayoutProps = {
   children: ReactNode;
 };
 
-export default function RootLayout({ children }: RootLayoutProps) {
+export default function RootLayout({ children }: TRootLayoutProps) {
   return (
     <html lang="ru">
       <head>

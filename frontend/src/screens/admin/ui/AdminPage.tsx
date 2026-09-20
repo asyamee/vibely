@@ -1,26 +1,28 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+
 import { useUserStore } from "@/shared/store/userStore";
 import {
-  BACKEND_URL,
   getAdminStats,
   reloadModel,
   startRetrain,
-  type AdminStats,
-} from "@/shared/api/admin.api";
+  type IAdminStats,
+} from "@/shared/api/admin";
+import { BACKEND_URL } from "@/shared/api/client";
 import { Button } from "@/shared/ui/Button/Button";
+
 import styles from "./AdminPage.module.css";
 
-type LogLine = { text: string; kind: "normal" | "error" | "best" | "success" | "fail" };
+type TLogLine = { text: string; kind: "normal" | "error" | "best" | "success" | "fail" };
 
-function classifyLog(line: string): LogLine["kind"] {
+function classifyLog(line: string): TLogLine["kind"] {
   if (line.includes("ERROR:")) return "error";
   if (line.includes("★ best")) return "best";
   return "normal";
 }
 
-const kindToStyle: Record<LogLine["kind"], string> = {
+const kindToStyle: Record<TLogLine["kind"], string> = {
   normal: styles.logLine,
   error: `${styles.logLine} ${styles.logError}`,
   best: `${styles.logLine} ${styles.logBest}`,
@@ -31,9 +33,9 @@ const kindToStyle: Record<LogLine["kind"], string> = {
 export const AdminPage: React.FC = () => {
   const accessToken = useUserStore((s) => s.accessToken);
 
-  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [stats, setStats] = useState<IAdminStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<LogLine[]>([]);
+  const [logs, setLogs] = useState<TLogLine[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamDone, setStreamDone] = useState<"done" | "failed" | null>(null);
   const [reloadMsg, setReloadMsg] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export const AdminPage: React.FC = () => {
     }
   }, [logs, isStreaming]);
 
-  const appendLog = (text: string, kind?: LogLine["kind"]) => {
+  const appendLog = (text: string, kind?: TLogLine["kind"]) => {
     setLogs((prev) => [...prev, { text, kind: kind ?? classifyLog(text) }]);
   };
 
@@ -197,7 +199,7 @@ export const AdminPage: React.FC = () => {
           </div>
         )}
         {stats?.last_log && (
-          <p className={styles.logLine} style={{ margin: 0, fontSize: 12 }}>
+          <p className={`${styles.logLine} ${styles.lastLog}`}>
             Последний лог: {stats.last_log}
           </p>
         )}
@@ -240,7 +242,7 @@ export const AdminPage: React.FC = () => {
               step={0.05}
               value={diversityWeight}
               onChange={(e) => setDiversityWeight(Number(e.target.value))}
-              style={{ accentColor: "var(--color-accent)", width: "100%" }}
+              className={styles.rangeInput}
               title="0 = без diversity loss, 1 = сильное разталкивание"
             />
           </div>
@@ -276,7 +278,7 @@ export const AdminPage: React.FC = () => {
       {/* Reload */}
       <div className={styles.card}>
         <h2 className={styles.sectionTitle}>Перезагрузка весов</h2>
-        <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: 14 }}>
+        <p className={styles.hint}>
           Загружает актуальный файл <code>user_encoder.pt</code> с диска без переобучения.
         </p>
         <div className={styles.actions}>
@@ -284,7 +286,7 @@ export const AdminPage: React.FC = () => {
             Перезагрузить модель
           </Button>
           {reloadMsg && (
-            <span style={{ color: reloadMsg.startsWith("✓") ? "#78ff78" : "#ff6b6b", fontSize: 14 }}>
+            <span className={reloadMsg.startsWith("✓") ? styles.reloadSuccess : styles.reloadError}>
               {reloadMsg}
             </span>
           )}

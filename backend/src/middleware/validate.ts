@@ -23,7 +23,8 @@ export function validateQuery(schema: ZodSchema) {
       res.status(400).json({ success: false, error: result.error.flatten() });
       return;
     }
-    req.query = result.data as Record<string, string>;
+    // Express 5: req.query — read-only getter, перезаписывать нельзя.
+    // Валидация проверяет формат; контроллеры читают req.query напрямую.
     next();
   };
 }

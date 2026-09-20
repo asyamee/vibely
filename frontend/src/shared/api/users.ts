@@ -1,80 +1,80 @@
 import { apiClient } from "./client";
-import type { RatingItem } from "./ratings.api";
+import type { IRatingItem } from "./ratings";
 
-export interface UserContacts {
+export interface IUserContacts {
   telegram: string | null;
   phone: string | null;
   contactEmail: string | null;
 }
 
-export type FriendshipStatus =
+export type TFriendshipStatus =
   | "self"
   | "none"
   | "pending_outgoing"
   | "pending_incoming"
   | "accepted";
 
-export interface UserProfile {
+export interface IUserProfile {
   userId: string;
   displayName: string | null;
   avatarUrl: string;
   genres: string[];
   favoriteTracks: Array<{ track_id: number; title: string; artist: string }>;
-  friendshipStatus: FriendshipStatus;
-  contacts: UserContacts | null;
+  friendshipStatus: TFriendshipStatus;
+  contacts: IUserContacts | null;
 }
 
-export interface UserNeighbor extends UserProfile {
+export interface IUserNeighbor extends IUserProfile {
   similarity: number;
 }
 
-export interface NearestUsersResponse {
+export interface INearestUsersResponse {
   userId: string;
-  neighbors: UserNeighbor[];
+  neighbors: IUserNeighbor[];
 }
 
-export interface UserFriend {
+export interface IUserFriend {
   userId: string;
   displayName: string | null;
   avatarUrl: string;
-  contacts: UserContacts;
+  contacts: IUserContacts;
 }
 
-export interface FriendsResponse {
+export interface IFriendsResponse {
   userId: string;
-  friends: UserFriend[];
+  friends: IUserFriend[];
 }
 
-export interface FriendRequestItem {
+export interface IFriendRequestItem {
   userId: string;
   displayName: string | null;
   avatarUrl: string;
   createdAt: string;
 }
 
-export interface FriendRequestsResponse {
+export interface IFriendRequestsResponse {
   userId: string;
-  requests: FriendRequestItem[];
+  requests: IFriendRequestItem[];
 }
 
-export interface UserPlaylist {
+export interface IUserPlaylist {
   playlistUuid: string;
   title: string | null;
   isPrimary: boolean;
   addedAt: string;
 }
 
-export interface UserPlaylistsResponse {
+export interface IUserPlaylistsResponse {
   userId: string;
-  playlists: UserPlaylist[];
+  playlists: IUserPlaylist[];
 }
 
-export async function getProfile(userId: string): Promise<UserProfile> {
-  const response = await apiClient.get<UserProfile>(`/users/${userId}/profile`);
+export async function getProfile(userId: string): Promise<IUserProfile> {
+  const response = await apiClient.get<IUserProfile>(`/users/${userId}/profile`);
   return response.data;
 }
 
-export interface UpdateProfilePayload {
+export interface IUpdateProfilePayload {
   displayName?: string;
   genres?: string[];
   telegram?: string | null;
@@ -84,9 +84,9 @@ export interface UpdateProfilePayload {
 
 export async function updateProfile(
   userId: string,
-  payload: UpdateProfilePayload,
-): Promise<UserProfile> {
-  const response = await apiClient.put<UserProfile>(`/users/${userId}/profile`, payload);
+  payload: IUpdateProfilePayload,
+): Promise<IUserProfile> {
+  const response = await apiClient.put<IUserProfile>(`/users/${userId}/profile`, payload);
   return response.data;
 }
 
@@ -98,20 +98,20 @@ export async function upsertUserProfile(
   await apiClient.post(`/users/${userId}/upsert`, { displayName, genres });
 }
 
-export async function getNearestUsers(userId: string, topK: number = 10): Promise<NearestUsersResponse> {
-  const response = await apiClient.get<NearestUsersResponse>(
+export async function getNearestUsers(userId: string, topK: number = 10): Promise<INearestUsersResponse> {
+  const response = await apiClient.get<INearestUsersResponse>(
     `/users/${userId}/nearest?top_k=${topK}`,
   );
   return response.data;
 }
 
-export async function getFriends(userId: string): Promise<FriendsResponse> {
-  const response = await apiClient.get<FriendsResponse>(`/users/${userId}/friends`);
+export async function getFriends(userId: string): Promise<IFriendsResponse> {
+  const response = await apiClient.get<IFriendsResponse>(`/users/${userId}/friends`);
   return response.data;
 }
 
-export async function getFriendRequests(userId: string): Promise<FriendRequestsResponse> {
-  const response = await apiClient.get<FriendRequestsResponse>(`/users/${userId}/friends/requests`);
+export async function getFriendRequests(userId: string): Promise<IFriendRequestsResponse> {
+  const response = await apiClient.get<IFriendRequestsResponse>(`/users/${userId}/friends/requests`);
   return response.data;
 }
 
@@ -143,14 +143,14 @@ export async function deleteAccount(userId: string, currentPassword: string): Pr
   await apiClient.delete(`/users/${userId}`, { data: { currentPassword } });
 }
 
-export async function listUserPlaylists(userId: string): Promise<UserPlaylistsResponse> {
-  const response = await apiClient.get<UserPlaylistsResponse>(`/users/${userId}/playlists`);
+export async function listUserPlaylists(userId: string): Promise<IUserPlaylistsResponse> {
+  const response = await apiClient.get<IUserPlaylistsResponse>(`/users/${userId}/playlists`);
   return response.data;
 }
 
 export async function addUserPlaylist(
   userId: string,
-  body: { playlistUuid: string; title?: string; ratings: RatingItem[] },
+  body: { playlistUuid: string; title?: string; ratings: IRatingItem[] },
 ): Promise<void> {
   await apiClient.post(`/users/${userId}/playlists`, body);
 }

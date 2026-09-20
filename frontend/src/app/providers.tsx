@@ -2,8 +2,9 @@
 
 import { ReactNode, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+
 import { useUserStore } from "@/shared/store/userStore";
-import { getMe } from "@/shared/api/auth.api";
+import { getMe } from "@/shared/api/auth";
 
 const PUBLIC_ROUTES = ["/login", "/register"];
 

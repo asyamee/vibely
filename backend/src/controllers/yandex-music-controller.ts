@@ -3,19 +3,30 @@ import { YMApi } from "ym-api";
 import dotenv from "dotenv";
 import { getPlaylistByUUID } from "../api/get-playlists-by-uuid.js";
 import { logger } from "../lib/logger.js";
+import { sendSuccess } from "../lib/response.js";
 import type { PlaylistTrackItem } from "../types/playlist-track.types.js";
 import type { RawPlaylistResponse } from "../types/playlist.types.js";
 
 dotenv.config();
 
-// Инициализация клиента Yandex Music
-const client = new YMApi();
-const access_token = process.env.ACCESS_TOKEN || "";
+// Ленивая инициализация: клиент создаётся при первом запросе,
+// а не при импорте модуля — backend стартует без Яндекс-токена.
+let client: YMApi | null = null;
 
-client.init({
-  access_token,
-  uid: parseInt(process.env.USER_ID || ""),
-});
+function getClient(): YMApi {
+  if (!client) {
+    const access_token = process.env.ACCESS_TOKEN;
+    const uid = process.env.USER_ID;
+    if (!access_token || !uid) {
+      throw new Error(
+        "ACCESS_TOKEN and USER_ID env vars are required for Yandex Music integration",
+      );
+    }
+    client = new YMApi();
+    client.init({ access_token, uid: parseInt(uid) });
+  }
+  return client;
+}
 
 /**
  * Получение плейлиста по UUID
@@ -54,7 +65,7 @@ export const playlist_UUID = async (
       tracks = tracks.slice(0, limit);
     }
 
-    res.json({
+    sendSuccess(res, {
       playlistUuid: response.playlistUuid,
       user: response.owner,
       tracks,
@@ -63,6 +74,6 @@ export const playlist_UUID = async (
     });
   } catch (e) {
     logger.error({ err: e }, "playlist_UUID: failed to fetch from Yandex Music");
-    res.status(400).json({ message: "Failed to fetch playlist from Yandex Music" });
+    res.status(400).json({ success: false, error: "Не удалось загрузить плейлист из Яндекс Музыки" });
   }
 };

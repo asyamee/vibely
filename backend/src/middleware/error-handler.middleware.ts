@@ -19,11 +19,11 @@ export const errorHandler = (
   const message =
     statusCode < 500 || process.env.NODE_ENV === "development"
       ? err.message
-      : "Internal Server Error";
+      : "Внутренняя ошибка сервера";
 
   res.status(statusCode).json({ success: false, error: message });
 };
 
 export const notFoundHandler = (req: Request, res: Response): void => {
-  res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
+  res.status(404).json({ success: false, error: `Маршрут ${req.originalUrl} не найден` });
 };

@@ -1,10 +1,12 @@
 import axios from "axios";
-import { BACKEND_URL, API_TIMEOUT } from "../config/env";
+
 import { useUserStore } from "../store/userStore";
+
+export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3011/api";
 
 export const apiClient = axios.create({
   baseURL: BACKEND_URL,
-  timeout: API_TIMEOUT,
+  timeout: 30_000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -25,11 +27,11 @@ apiClient.interceptors.request.use(
 
 // Response interceptor: обработать 401 и refresh token
 let isRefreshing = false;
-type QueueItem = {
+type TQueueItem = {
   resolve: (token: string | null) => void;
   reject: (error: unknown) => void;
 };
-let failedQueue: QueueItem[] = [];
+let failedQueue: TQueueItem[] = [];
 
 const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach((prom) => {
@@ -62,7 +64,13 @@ const isAuthEndpoint = (url: string | undefined): boolean => {
 };
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Backend оборачивает ответы в { success, data } — разворачиваем envelope.
+    if (response.data && typeof response.data === "object" && "success" in response.data && "data" in response.data) {
+      response.data = response.data.data;
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -89,7 +97,8 @@ apiClient.interceptors.response.use(
         const response = await axios.post(`${BACKEND_URL}/auth/refresh`, undefined, {
           withCredentials: true,
         });
-        const { accessToken } = response.data;
+        const refreshData = response.data?.data ?? response.data;
+        const { accessToken } = refreshData;
 
         useUserStore.getState().setAccessToken(accessToken);
         apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
@@ -112,7 +121,11 @@ apiClient.interceptors.response.use(
       }
     }
 
-    console.error("API error:", error.response?.status, error.response?.data);
+    // Подставляем сообщение от backend вместо дефолтного Axios "Request failed with status code ..."
+    const backendMessage = error.response?.data?.error;
+    if (backendMessage && typeof backendMessage === "string") {
+      error.message = backendMessage;
+    }
     return Promise.reject(error);
   },
 );

@@ -3,14 +3,13 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Bell, ListMusic, UserRound } from "lucide-react";
+import { Home, ListMusic, UserRound } from "lucide-react";
 import styles from "./AppShell.module.css";
 
 const HIDDEN_ROUTES = ["/login", "/register"];
 
 const TABS = [
   { href: "/", label: "Лента", icon: Home },
-  { href: "/notifications", label: "Уведомления", icon: Bell },
   { href: "/playlists", label: "Плейлисты", icon: ListMusic },
   { href: "/profile", label: "Профиль", icon: UserRound },
 ];

@@ -1,14 +1,14 @@
 import { MainFeedPage } from "@/screens/main-feed/ui/MainFeedPage";
-import { safeServerFetch, serverFetch } from "@/shared/api/server";
-import type { NearestUsersResponse } from "@/shared/api/users.api";
-import type { MeResponse } from "@/shared/api/auth.api";
+import { serverFetch } from "@/shared/api/server";
+import type { INearestUsersResponse } from "@/shared/api/users";
+import type { IMeResponse } from "@/shared/api/auth";
 
 export default async function Home() {
-  const me = await serverFetch<MeResponse>("/auth/me");
+  const me = await serverFetch<IMeResponse>("/auth/me");
 
-  const nearest = await safeServerFetch<NearestUsersResponse>(
+  const nearest = await serverFetch<INearestUsersResponse>(
     `/users/${me.userId}/nearest?top_k=10`,
-    { userId: me.userId, neighbors: [] },
+    { fallback: { userId: me.userId, neighbors: [] } },
   );
 
   return (

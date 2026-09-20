@@ -67,7 +67,7 @@ export const login = async (req: Request, res: Response) => {
 
 export const refresh = async (req: Request, res: Response) => {
   const rawRefreshToken = req.cookies.refreshToken as string | undefined;
-  if (!rawRefreshToken) throw new AppError("Refresh token not found", 401);
+  if (!rawRefreshToken) throw new AppError("Сессия истекла, войдите заново", 401);
   const result = await refreshToken(rawRefreshToken);
   res.cookie(REFRESH_COOKIE_NAME, result.rawRefreshToken, buildRefreshCookieOptions(result.refreshExpiresAt));
   res.cookie(ACCESS_COOKIE_NAME, result.accessToken, buildAccessCookieOptions());
