@@ -1,30 +1,30 @@
 import { apiClient } from "./client";
 
-export interface RegisterDto {
+export interface IRegisterDto {
   email: string;
   password: string;
   displayName?: string;
 }
 
-export interface LoginDto {
+export interface ILoginDto {
   email: string;
   password: string;
 }
 
-export interface AuthResponse {
+export interface IAuthResponse {
   userId: string;
   email: string;
   displayName: string | null;
   accessToken: string;
 }
 
-export async function register(data: RegisterDto): Promise<AuthResponse> {
-  const response = await apiClient.post<AuthResponse>("/auth/register", data);
+export async function register(data: IRegisterDto): Promise<IAuthResponse> {
+  const response = await apiClient.post<IAuthResponse>("/auth/register", data);
   return response.data;
 }
 
-export async function login(data: LoginDto): Promise<AuthResponse> {
-  const response = await apiClient.post<AuthResponse>("/auth/login", data);
+export async function login(data: ILoginDto): Promise<IAuthResponse> {
+  const response = await apiClient.post<IAuthResponse>("/auth/login", data);
   return response.data;
 }
 
@@ -37,13 +37,13 @@ export async function logout(): Promise<void> {
   await apiClient.post("/auth/logout");
 }
 
-export interface MeResponse {
+export interface IMeResponse {
   userId: string;
   email: string;
   displayName: string | null;
 }
 
-export async function getMe(): Promise<MeResponse> {
-  const response = await apiClient.get<MeResponse>("/auth/me");
+export async function getMe(): Promise<IMeResponse> {
+  const response = await apiClient.get<IMeResponse>("/auth/me");
   return response.data;
 }

@@ -1,13 +1,13 @@
 import { apiClient } from "./client";
 
-export interface PlaylistResponse {
+export interface IPlaylistResponse {
   playlistUuid: string;
   title: string;
   cover: string;
-  tracks: PlaylistTrackItem[];
+  tracks: IPlaylistTrackItem[];
 }
 
-export interface PlaylistTrackItem {
+export interface IPlaylistTrackItem {
   id: number;
   track: {
     id: string;
@@ -19,7 +19,7 @@ export interface PlaylistTrackItem {
   };
 }
 
-export interface RatingItem {
+export interface IRatingItem {
   playlistUuid: string;
   trackId: number;
   title: string;
@@ -29,25 +29,25 @@ export interface RatingItem {
   stars: 1 | 2 | 3 | 4 | 5;
 }
 
-export interface SaveRatingsBody {
+export interface ISaveRatingsBody {
   mainPlaylistUuid: string;
-  ratings: RatingItem[];
+  ratings: IRatingItem[];
 }
 
 export async function getPlaylist(
   uuid: string,
   params?: { shuffle?: boolean; limit?: number },
-): Promise<PlaylistResponse> {
-  const response = await apiClient.get<PlaylistResponse>(`/playlist/${uuid}`, { params });
+): Promise<IPlaylistResponse> {
+  const response = await apiClient.get<IPlaylistResponse>(`/playlist/${uuid}`, { params });
   return response.data;
 }
 
-export async function saveRatings(body: SaveRatingsBody): Promise<void> {
+export async function saveRatings(body: ISaveRatingsBody): Promise<void> {
   await apiClient.post("/ratings", body);
 }
 
-export async function getRandomTracks(count: number = 10): Promise<PlaylistTrackItem[]> {
-  const response = await apiClient.get<PlaylistTrackItem[]>(`/tracks/random?count=${count}`);
+export async function getRandomTracks(count: number = 10): Promise<IPlaylistTrackItem[]> {
+  const response = await apiClient.get<IPlaylistTrackItem[]>(`/tracks/random?count=${count}`);
   return response.data;
 }
 

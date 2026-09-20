@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 
-export interface AdminStats {
+export interface IAdminStats {
   train_status: "idle" | "running" | "done" | "failed";
   registered_users: number;
   num_tracks: number;
@@ -9,10 +9,8 @@ export interface AdminStats {
   last_log: string | null;
 }
 
-export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001/api";
-
-export async function getAdminStats(): Promise<AdminStats> {
-  const r = await apiClient.get<AdminStats>("/admin/stats");
+export async function getAdminStats(): Promise<IAdminStats> {
+  const r = await apiClient.get<IAdminStats>("/admin/stats");
   return r.data;
 }
 
