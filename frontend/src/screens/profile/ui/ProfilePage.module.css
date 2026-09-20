@@ -1,40 +1,133 @@
 .container {
-  max-width: 900px;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 32px 20px;
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: 32px;
 }
 
+/* === Header === */
 .header {
   display: flex;
-  gap: 24px;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.topBar {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  gap: 12px;
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.iconButton:hover {
+  background: var(--color-accent-alpha);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.avatarWrapper {
+  position: relative;
 }
 
 .avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: var(--radius-card);
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
   object-fit: cover;
-  flex-shrink: 0;
-}
-
-.info {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
+  border: 3px solid var(--color-accent);
 }
 
 .name {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--color-text);
   margin: 0;
 }
 
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* === Stats row === */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 8px;
+  background: var(--color-surface);
+  border-radius: var(--radius-element);
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* === Contacts === */
+.contactsCard {
+  background: var(--color-surface);
+  border-radius: var(--radius-element);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contactRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.contactIcon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.contactLabel {
+  color: var(--color-text-muted);
+  min-width: 80px;
+}
+
+/* === Sections === */
 .section {
   display: flex;
   flex-direction: column;
@@ -42,51 +135,71 @@
 }
 
 .sectionTitle {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--color-text);
   margin: 0;
 }
 
+/* === Friend list === */
 .friendList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .friendItem {
-  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
   background-color: var(--color-surface);
   border-radius: var(--radius-element);
+  transition: background 0.15s;
+}
+
+.friendItem:hover {
+  background: var(--color-accent-alpha);
+}
+
+.friendAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.friendInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.friendName {
+  font-size: 15px;
+  font-weight: 600;
   color: var(--color-text);
-  font-size: 16px;
 }
 
-.emptyMessage {
+.friendLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.friendContacts {
+  font-size: 13px;
   color: var(--color-text-muted);
-  font-size: 16px;
-  text-align: center;
-  padding: 24px;
-  margin: 0;
-}
-
-.error {
-  padding: 15px;
-  background-color: rgba(255, 0, 0, 0.1);
-  border-radius: var(--radius-element);
-  color: #ff6b6b;
-  text-align: center;
-  margin: 0;
+  margin-top: 2px;
 }
 
 .removeBtn {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--color-text-muted);
-  padding: 6px 12px;
+  padding: 6px 14px;
   border-radius: 999px;
   font-size: 13px;
   cursor: pointer;
@@ -105,38 +218,89 @@
   cursor: default;
 }
 
-.settingsLink {
-  color: var(--color-accent);
-  text-decoration: none;
+.emptyMessage {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 32px 16px;
+  margin: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-element);
+}
+
+.centered {
+  display: flex;
+  justify-content: center;
+}
+
+/* === Modal actions === */
+.modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* === Favorite tracks === */
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trackItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-element);
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.trackIndex {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.trackTitle {
   font-weight: 500;
-  font-size: 16px;
-  margin-top: 16px;
 }
 
-.settingsLink:hover {
-  text-decoration: underline;
+.trackArtist {
+  color: var(--color-text-muted);
+  margin-left: auto;
+  font-size: 13px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .container {
-    padding: 20px;
+    padding: 20px 16px;
     gap: 24px;
   }
 
-  .header {
-    gap: 16px;
-  }
-
   .avatar {
-    width: 100px;
-    height: 100px;
+    width: 110px;
+    height: 110px;
   }
 
   .name {
     font-size: 24px;
   }
 
-  .sectionTitle {
+  .statsRow {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .statCard {
+    padding: 12px 6px;
+  }
+
+  .statValue {
     font-size: 18px;
   }
 }
