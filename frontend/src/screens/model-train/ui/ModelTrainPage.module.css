@@ -1,31 +1,31 @@
 .container {
-  max-width: 800px;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 32px 20px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
 }
 
 .card {
   background-color: var(--color-surface);
-  border-radius: var(--radius-card);
-  padding: 40px;
+  border-radius: var(--radius-element);
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .title {
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--color-text);
   margin: 0;
   text-align: center;
 }
 
 .subtitle {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--color-text);
   margin: 0;
@@ -33,7 +33,7 @@
 
 .description {
   color: var(--color-text-muted);
-  font-size: 16px;
+  font-size: 14px;
   margin: 0;
   line-height: 1.6;
 }
@@ -48,9 +48,9 @@
 .progress {
   color: var(--color-accent);
   font-weight: 500;
-  font-size: 14px;
-  background-color: rgba(255, 149, 109, 0.1);
-  padding: 6px 12px;
+  font-size: 13px;
+  background-color: var(--color-accent-alpha);
+  padding: 4px 10px;
   border-radius: var(--radius-small);
 }
 
@@ -69,18 +69,17 @@
 .input {
   padding: 12px 16px;
   background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 149, 109, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-element);
   color: var(--color-text);
   font-size: 16px;
   font-family: "Instrument Sans", sans-serif;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s;
 }
 
 .input:focus {
   outline: none;
   border-color: var(--color-accent);
-  background-color: rgba(255, 149, 109, 0.05);
 }
 
 .hint {
@@ -101,35 +100,34 @@
 .submitButton {
   align-self: center;
   min-width: 200px;
-  margin-top: 16px;
 }
 
 .trackList {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
 
 .trackRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  background-color: rgba(255, 255, 255, 0.02);
+  padding: 12px 16px;
+  background-color: var(--color-surface);
   border-radius: var(--radius-element);
-  gap: 16px;
-  border: 1px solid rgba(255, 149, 109, 0.1);
+  gap: 12px;
 }
 
 .trackInfo {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .trackTitle {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--color-text);
   margin: 0;
@@ -143,7 +141,7 @@
 
 .stars {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .star {
@@ -154,7 +152,7 @@
   color: var(--color-text-muted);
   font-size: 20px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s, transform 0.2s;
   padding: 0;
   display: flex;
   align-items: center;
@@ -174,24 +172,24 @@
   display: flex;
   gap: 12px;
   justify-content: center;
-  margin-top: 16px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .container {
-    padding: 20px;
+    padding: 20px 16px;
+    gap: 24px;
   }
 
   .card {
-    padding: 24px;
+    padding: 20px;
   }
 
   .title {
-    font-size: 28px;
+    font-size: 24px;
   }
 
   .subtitle {
-    font-size: 20px;
+    font-size: 16px;
   }
 
   .header {

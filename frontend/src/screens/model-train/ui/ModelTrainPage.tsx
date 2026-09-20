@@ -2,30 +2,32 @@
 
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+
 import { useUserStore } from "@/shared/store/userStore";
-import { getPlaylist, getRandomTracks, saveRatings } from "@/shared/api/ratings.api";
-import type { PlaylistResponse, PlaylistTrackItem, RatingItem } from "@/shared/api/ratings.api";
+import { getPlaylist, getRandomTracks, saveRatings } from "@/shared/api/ratings";
+import type { IPlaylistResponse, IPlaylistTrackItem, IRatingItem } from "@/shared/api/ratings";
+import { extractPlaylistId } from "@/shared/lib/playlist";
 import { Button } from "@/shared/ui/Button/Button";
 import { BackButton } from "@/shared/ui/BackButton/BackButton";
+
 import styles from "./ModelTrainPage.module.css";
 
 const MAIN_PLAYLIST_LIMIT = 25;
 const EXTRA_TRACKS_COUNT = 10;
 const VIBELY_RANDOM_UUID = "vibely-random";
 
-type RatedTrack = RatingItem;
-type Phase = "input" | "rating_main" | "rating_extra" | "done";
+type TPhase = "input" | "rating_main" | "rating_extra" | "done";
 
 export const ModelTrainPage: React.FC = () => {
   const router = useRouter();
-  const { userId } = useUserStore();
+  const userId = useUserStore((s) => s.userId);
   const [playlistUUID, setPlaylistUUID] = useState("");
-  const [mainPlaylist, setMainPlaylist] = useState<PlaylistResponse | null>(null);
-  const [extraTracks, setExtraTracks] = useState<PlaylistTrackItem[]>([]);
+  const [mainPlaylist, setMainPlaylist] = useState<IPlaylistResponse | null>(null);
+  const [extraTracks, setExtraTracks] = useState<IPlaylistTrackItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ratings, setRatings] = useState<RatedTrack[]>([]);
-  const [phase, setPhase] = useState<Phase>("input");
+  const [ratings, setRatings] = useState<IRatingItem[]>([]);
+  const [phase, setPhase] = useState<TPhase>("input");
 
   const mainRatedCount = useMemo(() => {
     if (!mainPlaylist) return 0;
@@ -34,7 +36,7 @@ export const ModelTrainPage: React.FC = () => {
 
   const setRating = (
     playlistUuidValue: string,
-    item: PlaylistTrackItem,
+    item: IPlaylistTrackItem,
     stars: 1 | 2 | 3 | 4 | 5,
   ) => {
     const genre =
@@ -42,7 +44,7 @@ export const ModelTrainPage: React.FC = () => {
         ? (item.track.albums[0].genre ?? null)
         : null;
 
-    const rated: RatedTrack = {
+    const rated: IRatingItem = {
       playlistUuid: playlistUuidValue,
       trackId: item.id,
       title: item.track.title,
@@ -58,12 +60,6 @@ export const ModelTrainPage: React.FC = () => {
       );
       return [...withoutThis, rated];
     });
-  };
-
-  const extractPlaylistId = (input: string): string => {
-    const match = input.match(/playlists\/([^/?#]+)/);
-    if (match) return match[1];
-    return input.trim();
   };
 
   const handleLoadPlaylist = async () => {
@@ -143,19 +139,16 @@ export const ModelTrainPage: React.FC = () => {
           </p>
 
           <div className={styles.formGroup}>
-            <label htmlFor="playlistId" className={styles.label}>
-              UUID плейлиста
-            </label>
             <input
               id="playlistId"
               type="text"
-              placeholder="1746...4 или полная ссылка"
+              placeholder="UUID плейлиста или ссылка"
               value={playlistUUID}
               onChange={(e) => setPlaylistUUID(e.target.value)}
               className={styles.input}
             />
             <p className={styles.hint}>
-              Найдешь UUID в URL плейлиста: music.yandex.ru/users/{userId}/playlists/[UUID]
+              UUID в URL: music.yandex.ru/users/{userId}/playlists/[UUID]
             </p>
           </div>
 
@@ -282,17 +275,14 @@ export const ModelTrainPage: React.FC = () => {
   return null;
 };
 
-interface TrackRatingRowProps {
-  track: PlaylistTrackItem;
+interface ITrackRatingRowProps {
+  track: IPlaylistTrackItem;
   rating: number;
   onRate: (stars: 1 | 2 | 3 | 4 | 5) => void;
 }
 
-const TrackRatingRow: React.FC<TrackRatingRowProps> = ({ track, rating, onRate }) => {
-  const artistName =
-    track.track.artists && track.track.artists.length > 0 && track.track.artists[0]!.name
-      ? track.track.artists[0].name
-      : "Неизвестный исполнитель";
+const TrackRatingRow: React.FC<ITrackRatingRowProps> = ({ track, rating, onRate }) => {
+  const artistName = track.track.artists?.[0]?.name || "Неизвестный исполнитель";
 
   return (
     <div className={styles.trackRow}>

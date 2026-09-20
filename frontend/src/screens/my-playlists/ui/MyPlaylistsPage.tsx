@@ -2,32 +2,30 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+
 import {
   addUserPlaylist,
   listUserPlaylists,
   removeUserPlaylist,
-  type UserPlaylist,
-} from "@/shared/api/users.api";
-import { getPlaylist, type PlaylistResponse, type RatingItem } from "@/shared/api/ratings.api";
+  type IUserPlaylist,
+} from "@/shared/api/users";
+import { getPlaylist, type IPlaylistResponse, type IRatingItem } from "@/shared/api/ratings";
+import { extractPlaylistId } from "@/shared/lib/playlist";
 import { Button } from "@/shared/ui/Button/Button";
 import { Input } from "@/shared/ui/Input/Input";
+
 import styles from "./MyPlaylistsPage.module.css";
 
-interface Props {
+interface IMyPlaylistsPageProps {
   userId: string;
-  initialPlaylists: UserPlaylist[];
+  initialPlaylists: IUserPlaylist[];
 }
 
-const extractPlaylistId = (input: string): string => {
-  const match = input.match(/playlists\/([^/?#]+)/);
-  return match ? match[1] : input.trim();
-};
-
-export const MyPlaylistsPage: React.FC<Props> = ({ userId, initialPlaylists }) => {
+export const MyPlaylistsPage: React.FC<IMyPlaylistsPageProps> = ({ userId, initialPlaylists }) => {
   const router = useRouter();
-  const [playlists, setPlaylists] = useState<UserPlaylist[]>(initialPlaylists);
+  const [playlists, setPlaylists] = useState<IUserPlaylist[]>(initialPlaylists);
   const [uuidInput, setUuidInput] = useState("");
-  const [loaded, setLoaded] = useState<PlaylistResponse | null>(null);
+  const [loaded, setLoaded] = useState<IPlaylistResponse | null>(null);
   const [ratings, setRatings] = useState<Record<number, 1 | 2 | 3 | 4 | 5>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +58,7 @@ export const MyPlaylistsPage: React.FC<Props> = ({ userId, initialPlaylists }) =
     setError(null);
     setInfo("Пересчитываем эмбеддинг...");
     try {
-      const ratedItems: RatingItem[] = loaded.tracks
+      const ratedItems: IRatingItem[] = loaded.tracks
         .filter((t) => ratings[t.id])
         .map((t) => ({
           playlistUuid: loaded.playlistUuid,

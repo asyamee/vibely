@@ -1,0 +1,28 @@
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 80px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.message {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+  margin-top: 8px;
+}
