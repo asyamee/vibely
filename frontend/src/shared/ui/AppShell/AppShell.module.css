@@ -78,7 +78,7 @@
     left: 0;
     right: 0;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     background: rgba(14, 13, 19, 0.95);
     backdrop-filter: blur(12px);
     border-top: 1px solid rgba(255, 255, 255, 0.06);

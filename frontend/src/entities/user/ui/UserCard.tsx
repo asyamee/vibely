@@ -3,18 +3,21 @@
 import React from "react";
 import Link from "next/link";
 import { Heart, UserRound, ExternalLink } from "lucide-react";
-import { GenreTag } from "@/shared/ui/GenreTag/GenreTag";
-import styles from "./UserCard.module.css";
-import type { UserCardData } from "../model/types";
 
-interface UserCardProps {
-  user: UserCardData;
+import { onAvatarError } from "@/shared/lib/avatarFallback";
+import { GenreTag } from "@/shared/ui/GenreTag/GenreTag";
+
+import styles from "./UserCard.module.css";
+import type { IUserCardData } from "../model/types";
+
+interface IUserCardProps {
+  user: IUserCardData;
   onSendRequest?: () => void;
   onFavorite?: () => void;
   isFavorited?: boolean;
 }
 
-export const UserCard: React.FC<UserCardProps> = ({
+export const UserCard: React.FC<IUserCardProps> = ({
   user,
   onSendRequest,
   onFavorite,
@@ -27,6 +30,7 @@ export const UserCard: React.FC<UserCardProps> = ({
           <img
             src={user.avatarUrl}
             alt={user.displayName || user.userId}
+            onError={onAvatarError}
             className={styles.avatar}
           />
         </Link>
@@ -65,15 +69,13 @@ export const UserCard: React.FC<UserCardProps> = ({
       )}
 
       <div className={styles.actions}>
-        <button className={styles.actionButton} onClick={onFavorite}>
-          <UserRound className={styles.icon} size={24} />
-        </button>
         {onSendRequest && (
           <button className={styles.primaryButton} onClick={onSendRequest}>
+            <UserRound className={styles.icon} size={24} />
             Отправить запрос
           </button>
         )}
-        <button className={styles.actionButton} onClick={onFavorite}>
+        <button className={styles.actionButton} onClick={onFavorite} aria-label={isFavorited ? "Убрать из избранного" : "В избранное"}>
           <Heart
             className={styles.icon}
             size={24}

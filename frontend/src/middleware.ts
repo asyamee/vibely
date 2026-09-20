@@ -34,7 +34,7 @@ function isAdminAccessDenied(pathname: string, accessToken: string): boolean {
 const BACKEND =
   process.env.BACKEND_INTERNAL_URL ||
   process.env.NEXT_PUBLIC_BACKEND_URL ||
-  "http://localhost:3001/api";
+  "http://localhost:3011/api";
 
 function getSetCookies(headers: Headers): string[] {
   const fn = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
